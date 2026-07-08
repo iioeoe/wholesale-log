@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>도매 인사이트</title>
+<link rel="apple-touch-icon" href="icon-옷장.png">
+<link rel="icon" href="icon-옷장.png">
 <style>
 :root{
   --navy:#14236D;
@@ -19,7 +21,7 @@
   --card-bg-strong: rgba(255,255,255,0.78);
   --card-border: rgba(255,255,255,0.65);
   --gray: #8b8b95;
-  --danger:#d15a6e;
+  --danger:#eb5757;
   --ok:#4fa07a;
   --radius: 18px;
   --app-max: 520px;
@@ -28,16 +30,11 @@
 html,body{ margin:0; padding:0; height:100%; font-family:'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; color:var(--navy); }
 body{
   min-height:100vh; display:flex; justify-content:center;
-  background: linear-gradient(180deg, #EAD3F8 0%, #D9A0EF 100%);
-  background-attachment: fixed; background-size:100% 100%;
-  transition: background 0.35s ease;
+  background: #faf8f5;
+  --accent: var(--pink);
+  --modal-bg: #FBF7FB;
 }
-body.bg-tab1{ background: linear-gradient(180deg, #EAD3F8 0%, #D9A0EF 100%); } /* 구매완료: 라벤더 */
-body.bg-tab2{ background: linear-gradient(180deg, #FCE0EC 0%, #F6A8CC 100%); } /* 주문내역: 핑크 */
-body.bg-tab3{ background: linear-gradient(180deg, #DFF3FA 0%, #9FD8ED 100%); } /* 견적계산: 하늘색 */
-body.bg-tab4{ background: linear-gradient(180deg, #FBFAD8 0%, #EDE5A0 100%); } /* 위시리스트: 연노랑 */
-body.bg-tab5{ background: linear-gradient(180deg, #DFF6EA 0%, #9FE0C0 100%); } /* 사입삼촌: 민트 */
-body.bg-tab6{ background: linear-gradient(180deg, #FFEEDB 0%, #FDCFA0 100%); } /* 구매처: 피치 */
+
 
 #app{ width:100%; max-width: var(--app-max); min-height:100vh; position:relative; padding-bottom: 100px; }
 .topbar{
@@ -76,7 +73,7 @@ body.bg-tab6{ background: linear-gradient(180deg, #FFEEDB 0%, #FDCFA0 100%); } /
   background: rgba(255,255,255,0.5); border:1px solid rgba(255,255,255,0.7);
   color: var(--navy-soft); white-space:nowrap; transition: all .15s ease;
 }
-.chip.active{ background: var(--pink); color:#fff; border-color:var(--pink); box-shadow: 0 3px 10px rgba(227,91,165,0.35); }
+.chip.active{ background: var(--accent); color:#fff; border-color:var(--accent); box-shadow: 0 3px 10px rgba(20,35,109,0.18); }
 .chip.add-chip{ background: transparent; border:1.5px dashed var(--navy-soft); color:var(--navy-soft); }
 
 /* ---------- Item cards (Tab1) ---------- */
@@ -154,7 +151,7 @@ body.bg-tab6{ background: linear-gradient(180deg, #FFEEDB 0%, #FDCFA0 100%); } /
 .quote-item .qi-sub{ font-size:11px; color:var(--gray); margin-top:2px; }
 .quote-item .qi-total{ font-size:13.5px; font-weight:800; color:var(--navy); }
 .qi-del{ border:none; background:transparent; color:var(--danger); font-size:17px; cursor:pointer; padding:2px 4px; }
-.quote-total-bar{ position:sticky; bottom: 88px; z-index:20; margin-top:14px; background: linear-gradient(135deg, var(--pink), #C24A93); color:#fff; border-radius: 16px; padding: 14px 18px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 8px 20px rgba(227,91,165,0.35); }
+.quote-total-bar{ position:sticky; bottom: 88px; z-index:20; margin-top:14px; background: var(--accent); color:#fff; border-radius: 16px; padding: 14px 18px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 8px 20px rgba(20,35,109,0.25); }
 .quote-total-bar .label{ font-size:12px; opacity:0.9; }
 .quote-total-bar .amount{ font-size:19px; font-weight:800; }
 .quote-total-bar button{ border:none; background:rgba(255,255,255,0.25); color:#fff; font-size:11.5px; padding:7px 12px; border-radius:10px; font-weight:700; cursor:pointer; }
@@ -171,17 +168,17 @@ body.bg-tab6{ background: linear-gradient(180deg, #FFEEDB 0%, #FDCFA0 100%); } /
 .tab-btn{ flex:1; border:none; background:transparent; padding:8px 2px; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; border-radius:13px; color: var(--navy-soft); font-family:inherit; }
 .tab-btn .t-ic{ font-size:16px; }
 .tab-btn .t-label{ font-size:9px; font-weight:700; }
-.tab-btn.active{ background: var(--pink); color:#fff; }
+.tab-btn.active{ background: var(--accent); color:#fff; }
 
 /* ---------- FAB ---------- */
-.fab{ position:fixed; right:50%; bottom: 96px; transform: translateX(calc(var(--app-max)/2 - 56px)); width:52px; height:52px; border-radius:50%; border:none; background: linear-gradient(135deg, var(--pink), #C24A93); color:#fff; font-size:26px; cursor:pointer; box-shadow: 0 8px 18px rgba(227,91,165,0.4); z-index:39; display:flex; align-items:center; justify-content:center; }
+.fab{ position:fixed; right:50%; bottom: 96px; transform: translateX(calc(var(--app-max)/2 - 56px)); width:52px; height:52px; border-radius:50%; border:none; background: var(--accent); color:#fff; font-size:26px; cursor:pointer; box-shadow: 0 8px 18px rgba(20,35,109,0.3); z-index:39; display:flex; align-items:center; justify-content:center; transition: background 0.25s ease; }
 @media (max-width: 560px){ .fab{ transform:none; right:20px; } }
 .fab:active{ transform: scale(0.92); }
 
 /* ---------- Modal ---------- */
 .modal-overlay{ position:fixed; inset:0; background:rgba(20,15,35,0.42); backdrop-filter: blur(3px); z-index:100; display:none; align-items:flex-end; justify-content:center; }
 .modal-overlay.open{ display:flex; }
-.modal-sheet{ width:100%; max-width: var(--app-max); background: #FBF7FB; border-radius: 24px 24px 0 0; max-height: 90vh; overflow-y:auto; padding: 18px 18px 30px; animation: slideUp .25s ease; }
+.modal-sheet{ width:100%; max-width: var(--app-max); background: var(--modal-bg, #FBF7FB); border-radius: 24px 24px 0 0; max-height: 90vh; overflow-y:auto; padding: 18px 18px 30px; animation: slideUp .25s ease; }
 @keyframes slideUp{ from{ transform:translateY(30px); opacity:0;} to{ transform:translateY(0); opacity:1;} }
 .modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
 .modal-head h2{ font-size:17px; margin:0; font-weight:800; color:var(--navy); }
@@ -192,14 +189,14 @@ body.bg-tab6{ background: linear-gradient(180deg, #FFEEDB 0%, #FDCFA0 100%); } /
 .field input[type=text], .field input[type=number], .field input[type=date], .field textarea, .field select{
   width:100%; padding:11px 13px; border-radius:12px; border:1.5px solid #ecdff0; font-size:14px; font-family:inherit; background:#fff; color:var(--navy); outline:none;
 }
-.field input:focus, .field textarea:focus, .field select:focus{ border-color: var(--pink); }
+.field input:focus, .field textarea:focus, .field select:focus{ border-color: var(--accent); }
 .field textarea{ resize:vertical; min-height:60px; }
 .field-row{ display:flex; gap:10px; }
 .field-row > div{ flex:1; }
 
 .select-chip-group{ display:flex; flex-wrap:wrap; gap:7px; }
 .select-chip{ padding:8px 13px; border-radius:999px; font-size:12.5px; font-weight:600; background:#fff; border:1.5px solid #ecdff0; color:var(--navy-soft); cursor:pointer; }
-.select-chip.sel{ background:var(--pink); border-color:var(--pink); color:#fff; }
+.select-chip.sel{ background:var(--accent); border-color:var(--accent); color:#fff; }
 
 .photo-row{ display:flex; gap:8px; flex-wrap:wrap; }
 .photo-slot{ width:76px; height:76px; border-radius:14px; position:relative; overflow:hidden; background:#f2e9f3; border:1.5px dashed #d9c6dd; display:flex; align-items:center; justify-content:center; color:#b79dbb; font-size:22px; cursor:pointer; flex-shrink:0; }
@@ -208,7 +205,7 @@ body.bg-tab6{ background: linear-gradient(180deg, #FFEEDB 0%, #FDCFA0 100%); } /
 
 .modal-actions{ display:flex; gap:10px; margin-top:18px; }
 .btn{ flex:1; padding:13px; border-radius:14px; border:none; font-size:14.5px; font-weight:700; cursor:pointer; font-family:inherit; }
-.btn-primary{ background: linear-gradient(135deg, var(--pink), #C24A93); color:#fff; }
+.btn-primary{ background: var(--accent); color:#fff; }
 .btn-secondary{ background:#f0e8f1; color:var(--navy-soft); }
 .btn-danger{ background:#fbe4e8; color:var(--danger); }
 .btn-outline{ background:transparent; border:1.5px dashed var(--navy-soft); color:var(--navy-soft); }
@@ -222,7 +219,7 @@ body.bg-tab6{ background: linear-gradient(180deg, #FFEEDB 0%, #FDCFA0 100%); } /
 .badge-pay{ display:inline-block; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:700; background: var(--c3); color:var(--navy); margin: 2px 4px 2px 0; }
 .account-box{ display:flex; justify-content:space-between; align-items:center; background:#f6eef6; border-radius:12px; padding:12px 14px; margin-top:6px; }
 .account-box .num{ font-size:14px; font-weight:700; color:var(--navy); }
-.copy-btn{ border:none; background:var(--pink); color:#fff; font-size:11px; font-weight:700; padding:6px 10px; border-radius:8px; cursor:pointer;}
+.copy-btn{ border:none; background:var(--accent); color:#fff; font-size:11px; font-weight:700; padding:6px 10px; border-radius:8px; cursor:pointer;}
 
 .fee-box{ background:#f6eef6; border-radius:14px; padding:14px; margin-top:6px; }
 .fee-row{ display:flex; justify-content:space-between; font-size:13px; padding:5px 0; color:var(--navy-soft); }
@@ -521,6 +518,22 @@ const CAT_COLOR = { "의류": "#F5A8D6", "신발": "#E7A97C", "가방": "#BAA6C1
 const BUILDING_COLORS = ["#F5A8D6","#8FB8D6","#E7A97C","#BAA6C1","#7FC7A0","#E35BA5","#C9A6E3"];
 const SAIP_FEE_PER_SHOP = 2000;
 const SAIP_SHIPPING_FEE = 4000;
+const TAB_ACCENT = {
+  1: '#D9A0EF', // 구매완료: 라벤더
+  2: '#F6A8CC', // 주문내역: 핑크
+  3: '#9FD8ED', // 견적계산: 하늘색
+  4: '#fde6b1', // 위시리스트: 연노랑
+  5: '#c5e3a3', // 사입삼촌: 민트
+  6: '#FDCFA0'  // 구매처: 피치
+};
+const TAB_LIGHT = {
+  1: '#F3E6FB', // 구매완료: 연한 라벤더
+  2: '#FDEAF2', // 주문내역: 연한 핑크
+  3: '#EAF7FC', // 견적계산: 연한 하늘색
+  4: '#FFF8E8', // 위시리스트: 연한 연노랑
+  5: '#EDF7E8', // 사입삼촌: 연한 민트
+  6: '#FFF3E7'  // 구매처: 연한 피치
+};
 
 let state = {
   items: [],
@@ -576,7 +589,7 @@ function saveLocal(){ localStorage.setItem('wsl_data', JSON.stringify(state)); }
 /* ============ 초기화 ============ */
 function init(){
   loadLocal();
-  document.body.classList.add('bg-tab1');
+  setAccent(1);
   document.getElementById('s_binId').value = state.settings.binId || "";
   document.getElementById('s_apiKey').value = state.settings.apiKey || "";
   updateSyncInfo();
@@ -602,8 +615,11 @@ function switchTab(n){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelector('.tab-btn[data-tab="'+n+'"]').classList.add('active');
   document.getElementById('fabBtn').style.display = (n===3) ? 'none' : 'flex';
-  document.body.classList.remove('bg-tab1','bg-tab2','bg-tab3','bg-tab4','bg-tab5','bg-tab6');
-  document.body.classList.add('bg-tab'+n);
+  setAccent(n);
+}
+function setAccent(n){
+  document.body.style.setProperty('--accent', TAB_ACCENT[n] || TAB_ACCENT[1]);
+  document.body.style.setProperty('--modal-bg', TAB_LIGHT[n] || TAB_LIGHT[1]);
 }
 function handleFab(){
   if(ui.currentTab === 1) openItemModal();

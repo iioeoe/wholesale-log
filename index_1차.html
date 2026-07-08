@@ -1,0 +1,1302 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>도매 인사이트</title>
+<style>
+:root{
+  --navy:#14236D;
+  --navy-soft:#3B4A85;
+  --pink:#E35BA5;
+  --c1:#E7CCD1;
+  --c2:#F7BDCB;
+  --c3:#FFE0CE;
+  --c4:#F5A8D6;
+  --c5:#FBC7D4;
+  --c6:#BAA6C1;
+  --card-bg: rgba(255,255,255,0.58);
+  --card-bg-strong: rgba(255,255,255,0.78);
+  --card-border: rgba(255,255,255,0.65);
+  --gray: #8b8b95;
+  --danger:#d15a6e;
+  --ok:#4fa07a;
+  --radius: 18px;
+  --app-max: 520px;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{ margin:0; padding:0; height:100%; font-family:'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; color:var(--navy); }
+body{
+  min-height:100vh; display:flex; justify-content:center;
+  background: linear-gradient(180deg, #EAD3F8 0%, #D9A0EF 100%);
+  background-attachment: fixed; background-size:100% 100%;
+  transition: background 0.35s ease;
+}
+body.bg-tab1{ background: linear-gradient(180deg, #EAD3F8 0%, #D9A0EF 100%); } /* 구매완료: 라벤더 */
+body.bg-tab2{ background: linear-gradient(180deg, #FCE0EC 0%, #F6A8CC 100%); } /* 주문내역: 핑크 */
+body.bg-tab3{ background: linear-gradient(180deg, #DFF3FA 0%, #9FD8ED 100%); } /* 견적계산: 하늘색 */
+body.bg-tab4{ background: linear-gradient(180deg, #FBFAD8 0%, #EDE5A0 100%); } /* 위시리스트: 연노랑 */
+body.bg-tab5{ background: linear-gradient(180deg, #DFF6EA 0%, #9FE0C0 100%); } /* 사입삼촌: 민트 */
+body.bg-tab6{ background: linear-gradient(180deg, #FFEEDB 0%, #FDCFA0 100%); } /* 구매처: 피치 */
+
+#app{ width:100%; max-width: var(--app-max); min-height:100vh; position:relative; padding-bottom: 100px; }
+.topbar{
+  position:sticky; top:0; z-index:30; padding: 18px 18px 12px;
+  display:flex; align-items:center; justify-content:space-between;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  background: rgba(255,255,255,0.22);
+}
+.topbar h1{ font-size:19px; margin:0; font-weight:800; letter-spacing:-0.3px; color:var(--navy); }
+.topbar .sub{ font-size:11px; color:var(--navy-soft); margin-top:2px; font-weight:500;}
+.icon-btn{
+  width:38px; height:38px; border-radius:12px; border:none;
+  background: var(--card-bg); backdrop-filter: blur(10px);
+  display:flex; align-items:center; justify-content:center;
+  font-size:17px; cursor:pointer; color:var(--navy);
+  box-shadow: 0 2px 8px rgba(20,35,109,0.08);
+}
+.icon-btn:active{ transform: scale(0.94); }
+
+.tab-panel{ display:none; padding: 4px 16px 20px; }
+.tab-panel.active{ display:block; }
+
+.search-box{
+  display:flex; align-items:center; gap:8px;
+  background: var(--card-bg); backdrop-filter: blur(10px);
+  border: 1px solid var(--card-border); border-radius: 14px; padding: 10px 14px; margin: 10px 0 12px;
+}
+.search-box input{ border:none; background:transparent; outline:none; flex:1; font-size:14px; color:var(--navy); font-family:inherit; }
+.search-box input::placeholder{ color:#a9a9c2; }
+.search-box .ic{ font-size:15px; opacity:0.6; }
+
+.chip-row{ display:flex; gap:8px; overflow-x:auto; padding: 2px 0 12px; scrollbar-width:none; }
+.chip-row::-webkit-scrollbar{ display:none; }
+.chip{
+  flex-shrink:0; padding:7px 14px; border-radius:999px; font-size:12.5px; font-weight:600; cursor:pointer;
+  background: rgba(255,255,255,0.5); border:1px solid rgba(255,255,255,0.7);
+  color: var(--navy-soft); white-space:nowrap; transition: all .15s ease;
+}
+.chip.active{ background: var(--pink); color:#fff; border-color:var(--pink); box-shadow: 0 3px 10px rgba(227,91,165,0.35); }
+.chip.add-chip{ background: transparent; border:1.5px dashed var(--navy-soft); color:var(--navy-soft); }
+
+/* ---------- Item cards (Tab1) ---------- */
+.item-card{ display:flex; gap:12px; padding:12px; background: var(--card-bg); backdrop-filter: blur(10px); border: 1px solid var(--card-border); border-radius: var(--radius); margin-bottom:10px; cursor:pointer; }
+.item-card:active{ transform: scale(0.985); }
+.item-thumb{ width:66px; height:66px; border-radius:14px; object-fit:cover; flex-shrink:0; background: linear-gradient(135deg, var(--c1), var(--c5)); }
+.item-thumb.empty{ display:flex; align-items:center; justify-content:center; font-size:22px; color:#fff; opacity:0.85; }
+.item-info{ flex:1; min-width:0; }
+.item-top{ display:flex; align-items:center; gap:6px; margin-bottom:3px; }
+.cat-badge{ font-size:10px; font-weight:700; padding:3px 8px; border-radius:999px; color:#fff; flex-shrink:0; }
+.item-name{ font-size:15px; font-weight:700; color:var(--navy); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.item-meta{ font-size:11.5px; color:var(--gray); margin-top:3px; }
+.item-price{ font-size:14px; font-weight:800; color:var(--pink); margin-top:5px; }
+
+.empty-state{ text-align:center; padding: 60px 20px; color:var(--navy-soft); }
+.empty-state .emoji{ font-size:36px; margin-bottom:10px; }
+.empty-state p{ font-size:13px; margin:4px 0; opacity:0.8; }
+
+/* ---------- Simple list card (도매상/사입/위시) ---------- */
+.wl-card{ display:flex; align-items:center; gap:10px; padding: 13px 14px; background: var(--card-bg); backdrop-filter: blur(10px); border: 1px solid var(--card-border); border-radius: var(--radius); margin-bottom:9px; cursor:pointer; }
+.wl-card:active{ transform: scale(0.985); }
+.wl-dot{ width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.wl-text{ flex:1; min-width:0; }
+.wl-text .wl-name{ font-size:15px; font-weight:700; color:var(--navy); }
+.wl-text .wl-loc{ font-size:10px; color:var(--gray); margin-top:3px; font-weight:500; }
+.wl-arrow{ margin-left:auto; color:#c3b9d6; font-size:16px; flex-shrink:0; }
+
+/* ---------- Order lines (주문내역) ---------- */
+.order-date-head{ font-size:12px; font-weight:700; color:var(--navy-soft); padding: 10px 2px 6px; }
+.order-line{ display:flex; align-items:center; gap:10px; padding:12px 13px; background: var(--card-bg); backdrop-filter: blur(10px); border:1px solid var(--card-border); border-radius: var(--radius); margin-bottom:8px; cursor:pointer; }
+.order-line:active{ transform: scale(0.985); }
+.order-line .ol-info{ flex:1; min-width:0; }
+.order-line .ol-name{ font-size:14px; font-weight:700; color:var(--navy); }
+.order-line .ol-opt{ font-size:11px; color:var(--gray); margin-top:3px; }
+.order-line .ol-sub{ font-size:11px; color:var(--gray); margin-top:2px; }
+.status-chip{ flex-shrink:0; padding:6px 11px; border-radius:999px; font-size:11px; font-weight:700; }
+.status-chip.back{ background:#fde3e8; color:var(--danger); }
+.status-chip.done{ background:#e2f3ea; color:var(--ok); }
+
+/* ---------- Wish cards ---------- */
+.wish-card{ display:flex; gap:12px; padding:13px; background: var(--card-bg); backdrop-filter: blur(10px); border:1px solid var(--card-border); border-radius: var(--radius); margin-bottom:10px; cursor:pointer; }
+.wish-card:active{ transform: scale(0.985); }
+.wish-emoji{ width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,#F0E9A0,#FBFAD8); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+.wish-info{ flex:1; min-width:0; }
+.wish-info .wi-name{ font-size:14.5px; font-weight:700; color:var(--navy); }
+.wish-info .wi-sub{ font-size:11.5px; color:var(--gray); margin-top:3px; }
+.wish-info .wi-price{ font-size:13.5px; font-weight:800; color:var(--pink); margin-top:4px; }
+
+/* ---------- Saip cards (사입삼촌) ---------- */
+.saip-card{ padding:14px; background: var(--card-bg); backdrop-filter: blur(10px); border:1px solid var(--card-border); border-radius: var(--radius); margin-bottom:10px; cursor:pointer; }
+.saip-card:active{ transform: scale(0.985); }
+.saip-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.saip-date{ font-size:13.5px; font-weight:800; color:var(--navy); }
+.saip-badges span{ font-size:10px; font-weight:700; padding:3px 8px; border-radius:999px; margin-left:4px; }
+.b-daenap{ background:#dce8fb; color:#3a5fa8; }
+.b-wannap{ background:#e2f3ea; color:var(--ok); }
+.b-none{ background:#f3eef4; color:#b3a9b6; }
+.saip-meta{ font-size:11.5px; color:var(--gray); }
+.saip-total{ font-size:15px; font-weight:800; color:var(--pink); margin-top:6px; }
+
+/* dynamic item rows in saip form */
+.saip-row{ background:#fff; border:1.5px solid #ecdff0; border-radius:14px; padding:12px; margin-bottom:10px; position:relative; }
+.saip-row .row-num{ font-size:11px; font-weight:700; color:var(--gray); margin-bottom:8px; }
+.saip-row .row-del{ position:absolute; top:10px; right:10px; border:none; background:#fbe4e8; color:var(--danger); width:24px; height:24px; border-radius:8px; font-size:12px; cursor:pointer; }
+
+/* ---------- Quote tab (견적계산) ---------- */
+.quote-form{ background: var(--card-bg-strong); backdrop-filter: blur(10px); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 14px; margin: 10px 0 16px; }
+.quote-form .row2{ display:flex; gap:8px; margin-top:8px; }
+.quote-group{ margin-bottom: 16px; }
+.quote-group-head{ display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; font-weight:700; color:var(--navy-soft); padding: 0 2px 6px; }
+.quote-group-head .sub-total{ color:var(--pink); font-weight:800; }
+.quote-item{ display:flex; align-items:center; gap:10px; background: var(--card-bg); border:1px solid var(--card-border); border-radius:14px; padding:10px 12px; margin-bottom:7px; }
+.quote-item .qi-info{ flex:1; min-width:0; }
+.quote-item .qi-name{ font-size:13.5px; font-weight:700; color:var(--navy); }
+.quote-item .qi-sub{ font-size:11px; color:var(--gray); margin-top:2px; }
+.quote-item .qi-total{ font-size:13.5px; font-weight:800; color:var(--navy); }
+.qi-del{ border:none; background:transparent; color:var(--danger); font-size:17px; cursor:pointer; padding:2px 4px; }
+.quote-total-bar{ position:sticky; bottom: 88px; z-index:20; margin-top:14px; background: linear-gradient(135deg, var(--pink), #C24A93); color:#fff; border-radius: 16px; padding: 14px 18px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 8px 20px rgba(227,91,165,0.35); }
+.quote-total-bar .label{ font-size:12px; opacity:0.9; }
+.quote-total-bar .amount{ font-size:19px; font-weight:800; }
+.quote-total-bar button{ border:none; background:rgba(255,255,255,0.25); color:#fff; font-size:11.5px; padding:7px 12px; border-radius:10px; font-weight:700; cursor:pointer; }
+
+/* ---------- Bottom tab bar ---------- */
+.tabbar{
+  position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
+  width: calc(100% - 24px); max-width: calc(var(--app-max) - 24px);
+  display:flex; background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border-radius: 20px; padding:5px; box-shadow: 0 8px 24px rgba(20,35,109,0.15);
+  z-index:40; border:1px solid rgba(255,255,255,0.6);
+}
+.tab-btn{ flex:1; border:none; background:transparent; padding:8px 2px; display:flex; flex-direction:column; align-items:center; gap:2px; cursor:pointer; border-radius:13px; color: var(--navy-soft); font-family:inherit; }
+.tab-btn .t-ic{ font-size:16px; }
+.tab-btn .t-label{ font-size:9px; font-weight:700; }
+.tab-btn.active{ background: var(--pink); color:#fff; }
+
+/* ---------- FAB ---------- */
+.fab{ position:fixed; right:50%; bottom: 96px; transform: translateX(calc(var(--app-max)/2 - 56px)); width:52px; height:52px; border-radius:50%; border:none; background: linear-gradient(135deg, var(--pink), #C24A93); color:#fff; font-size:26px; cursor:pointer; box-shadow: 0 8px 18px rgba(227,91,165,0.4); z-index:39; display:flex; align-items:center; justify-content:center; }
+@media (max-width: 560px){ .fab{ transform:none; right:20px; } }
+.fab:active{ transform: scale(0.92); }
+
+/* ---------- Modal ---------- */
+.modal-overlay{ position:fixed; inset:0; background:rgba(20,15,35,0.42); backdrop-filter: blur(3px); z-index:100; display:none; align-items:flex-end; justify-content:center; }
+.modal-overlay.open{ display:flex; }
+.modal-sheet{ width:100%; max-width: var(--app-max); background: #FBF7FB; border-radius: 24px 24px 0 0; max-height: 90vh; overflow-y:auto; padding: 18px 18px 30px; animation: slideUp .25s ease; }
+@keyframes slideUp{ from{ transform:translateY(30px); opacity:0;} to{ transform:translateY(0); opacity:1;} }
+.modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.modal-head h2{ font-size:17px; margin:0; font-weight:800; color:var(--navy); }
+.modal-close{ border:none; background:rgba(20,35,109,0.06); width:32px; height:32px; border-radius:10px; font-size:15px; cursor:pointer; color:var(--navy); }
+
+.field{ margin-bottom:14px; }
+.field label{ display:block; font-size:12px; font-weight:700; color:var(--navy-soft); margin-bottom:6px; }
+.field input[type=text], .field input[type=number], .field input[type=date], .field textarea, .field select{
+  width:100%; padding:11px 13px; border-radius:12px; border:1.5px solid #ecdff0; font-size:14px; font-family:inherit; background:#fff; color:var(--navy); outline:none;
+}
+.field input:focus, .field textarea:focus, .field select:focus{ border-color: var(--pink); }
+.field textarea{ resize:vertical; min-height:60px; }
+.field-row{ display:flex; gap:10px; }
+.field-row > div{ flex:1; }
+
+.select-chip-group{ display:flex; flex-wrap:wrap; gap:7px; }
+.select-chip{ padding:8px 13px; border-radius:999px; font-size:12.5px; font-weight:600; background:#fff; border:1.5px solid #ecdff0; color:var(--navy-soft); cursor:pointer; }
+.select-chip.sel{ background:var(--pink); border-color:var(--pink); color:#fff; }
+
+.photo-row{ display:flex; gap:8px; flex-wrap:wrap; }
+.photo-slot{ width:76px; height:76px; border-radius:14px; position:relative; overflow:hidden; background:#f2e9f3; border:1.5px dashed #d9c6dd; display:flex; align-items:center; justify-content:center; color:#b79dbb; font-size:22px; cursor:pointer; flex-shrink:0; }
+.photo-slot img{ width:100%; height:100%; object-fit:cover; }
+.photo-slot .rm{ position:absolute; top:2px; right:2px; width:19px; height:19px; border-radius:50%; background:rgba(0,0,0,0.55); color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer; }
+
+.modal-actions{ display:flex; gap:10px; margin-top:18px; }
+.btn{ flex:1; padding:13px; border-radius:14px; border:none; font-size:14.5px; font-weight:700; cursor:pointer; font-family:inherit; }
+.btn-primary{ background: linear-gradient(135deg, var(--pink), #C24A93); color:#fff; }
+.btn-secondary{ background:#f0e8f1; color:var(--navy-soft); }
+.btn-danger{ background:#fbe4e8; color:var(--danger); }
+.btn-outline{ background:transparent; border:1.5px dashed var(--navy-soft); color:var(--navy-soft); }
+.btn:active{ transform: scale(0.97); }
+
+.detail-photo-scroll{ display:flex; gap:8px; overflow-x:auto; margin-bottom:16px; }
+.detail-photo-scroll img{ width:150px; height:150px; border-radius:16px; object-fit:cover; flex-shrink:0; }
+.detail-row{ display:flex; justify-content:space-between; padding:10px 2px; border-bottom:1px solid #f0e6f1; font-size:13.5px; }
+.detail-row .k{ color:var(--gray); font-weight:600; }
+.detail-row .v{ color:var(--navy); font-weight:700; text-align:right; max-width:65%; }
+.badge-pay{ display:inline-block; padding:4px 10px; border-radius:8px; font-size:11.5px; font-weight:700; background: var(--c3); color:var(--navy); margin: 2px 4px 2px 0; }
+.account-box{ display:flex; justify-content:space-between; align-items:center; background:#f6eef6; border-radius:12px; padding:12px 14px; margin-top:6px; }
+.account-box .num{ font-size:14px; font-weight:700; color:var(--navy); }
+.copy-btn{ border:none; background:var(--pink); color:#fff; font-size:11px; font-weight:700; padding:6px 10px; border-radius:8px; cursor:pointer;}
+
+.fee-box{ background:#f6eef6; border-radius:14px; padding:14px; margin-top:6px; }
+.fee-row{ display:flex; justify-content:space-between; font-size:13px; padding:5px 0; color:var(--navy-soft); }
+.fee-row.total{ border-top:1.5px dashed #ddc9de; margin-top:6px; padding-top:10px; font-size:15px; font-weight:800; color:var(--navy); }
+.saip-item-table{ font-size:12.5px; }
+.sit-row{ background:#fff; border-radius:12px; padding:10px 12px; margin-bottom:7px; }
+.sit-row .sit-name{ font-weight:700; color:var(--navy); font-size:13.5px; }
+.sit-row .sit-sub{ color:var(--gray); margin-top:3px; }
+
+.status-toggle-row{ display:flex; gap:8px; }
+.status-toggle{ flex:1; text-align:center; padding:10px; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid #ecdff0; color:var(--navy-soft); background:#fff; }
+.status-toggle.on-daenap.sel{ background:#dce8fb; border-color:#a7c0ed; color:#3a5fa8; }
+.status-toggle.on-wannap.sel{ background:#e2f3ea; border-color:#9ed7b8; color:var(--ok); }
+
+.toast{ position:fixed; left:50%; bottom:160px; transform:translateX(-50%); background:rgba(20,20,30,0.85); color:#fff; padding:10px 18px; border-radius:12px; font-size:12.5px; z-index:200; opacity:0; transition:opacity .2s ease; pointer-events:none; }
+.toast.show{ opacity:1; }
+.settings-sync-info{ font-size:11.5px; color:var(--gray); margin-top:4px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <div>
+      <h1>도매 인사이트</h1>
+      <div class="sub" id="headerSub">구매 기록 &amp; 구매처 관리</div>
+    </div>
+    <button class="icon-btn" onclick="openSettings()">⚙</button>
+  </div>
+
+  <!-- TAB 1: 구매완료 -->
+  <div class="tab-panel active" id="panel-1">
+    <div class="search-box"><span class="ic">🔍</span><input type="text" id="itemSearch" placeholder="상품명 · 색상 · 구매처 검색" oninput="renderItems()"></div>
+    <div class="chip-row" id="itemCatFilter"></div>
+    <div id="itemList"></div>
+  </div>
+
+  <!-- TAB 2: 주문내역 -->
+  <div class="tab-panel" id="panel-2">
+    <div class="search-box"><span class="ic">🔍</span><input type="text" id="orderSearch" placeholder="상품명 · 구매처 검색" oninput="renderOrders()"></div>
+    <div class="chip-row" id="orderStatusFilter"></div>
+    <div id="orderList"></div>
+  </div>
+
+  <!-- TAB 3: 견적 계산기 -->
+  <div class="tab-panel" id="panel-3">
+    <div class="quote-form">
+      <div class="field" style="margin-bottom:8px;"><label>상품명</label><input type="text" id="qName" placeholder="예: 니트 원피스"></div>
+      <div class="row2">
+        <div class="field" style="flex:1; margin-bottom:0;"><label>예상 단가</label><input type="number" id="qPrice" placeholder="0"></div>
+        <div class="field" style="width:80px; margin-bottom:0;"><label>수량</label><input type="number" id="qQty" placeholder="1" value="1"></div>
+      </div>
+      <div class="field" style="margin-top:8px; margin-bottom:0;"><label>구매처 (선택)</label><select id="qWholesaler"><option value="">미지정</option></select></div>
+      <button class="btn btn-primary" style="width:100%; margin-top:12px;" onclick="addQuoteItem()">+ 후보에 담기</button>
+    </div>
+    <div id="quoteList"></div>
+    <div id="quoteEmpty" class="empty-state" style="display:none;"><div class="emoji">🧮</div><p>구매 전 후보 상품을 담아보세요</p><p>구매처별로 합계가 자동 계산돼요</p></div>
+  </div>
+
+  <!-- TAB 4: 위시리스트 -->
+  <div class="tab-panel" id="panel-4">
+    <div class="search-box"><span class="ic">🔍</span><input type="text" id="wishSearch" placeholder="상품명 · 구매처 검색" oninput="renderWishes()"></div>
+    <div id="wishList"></div>
+  </div>
+
+  <!-- TAB 5: 사입삼촌 -->
+  <div class="tab-panel" id="panel-5">
+    <div class="search-box"><span class="ic">🔍</span><input type="text" id="saipSearch" placeholder="상호명 · 신청일 검색" oninput="renderSaips()"></div>
+    <div id="saipList"></div>
+  </div>
+
+  <!-- TAB 6: 구매처 -->
+  <div class="tab-panel" id="panel-6">
+    <div class="search-box"><span class="ic">🔍</span><input type="text" id="wlSearch" placeholder="상호명 또는 건물 검색" oninput="renderWholesalers()"></div>
+    <div class="chip-row" id="buildingFilter"></div>
+    <div id="wlList"></div>
+  </div>
+
+  <div class="fab" id="fabBtn" onclick="handleFab()">+</div>
+
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="1" onclick="switchTab(1)"><span class="t-ic">🛍️</span><span class="t-label">구매완료</span></button>
+    <button class="tab-btn" data-tab="2" onclick="switchTab(2)"><span class="t-ic">📦</span><span class="t-label">주문내역</span></button>
+    <button class="tab-btn" data-tab="3" onclick="switchTab(3)"><span class="t-ic">🧮</span><span class="t-label">견적계산</span></button>
+    <button class="tab-btn" data-tab="4" onclick="switchTab(4)"><span class="t-ic">⭐</span><span class="t-label">위시</span></button>
+    <button class="tab-btn" data-tab="5" onclick="switchTab(5)"><span class="t-ic">🧾</span><span class="t-label">사입삼촌</span></button>
+    <button class="tab-btn" data-tab="6" onclick="switchTab(6)"><span class="t-ic">🏬</span><span class="t-label">구매처</span></button>
+  </div>
+</div>
+
+<!-- ============ MODAL: 상품 추가/수정 (탭1) ============ -->
+<div class="modal-overlay" id="itemModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2 id="itemModalTitle">상품 등록</h2><button class="modal-close" onclick="closeModal('itemModal')">✕</button></div>
+    <div class="field"><label>대분류</label><div class="select-chip-group" id="majorCatGroup"></div></div>
+    <div class="field"><label>소분류</label><div class="select-chip-group" id="minorCatGroup"></div></div>
+    <div class="field"><label>상품명</label><input type="text" id="f_name" placeholder="예: 플리츠 스커트"></div>
+    <div class="field-row">
+      <div class="field"><label>금액 (원)</label><input type="number" id="f_price" placeholder="0"></div>
+      <div class="field"><label>구매일</label><input type="date" id="f_date"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>색상</label><input type="text" id="f_color" placeholder="예: 블랙"></div>
+      <div class="field"><label>사이즈</label><input type="text" id="f_size" placeholder="예: FREE"></div>
+    </div>
+    <div class="field"><label>혼용률</label><input type="text" id="f_mix" placeholder="예: 폴리 80% 스판 20%"></div>
+    <div class="field"><label>구매처</label><select id="f_wholesaler"><option value="">선택 안함</option></select></div>
+    <div class="field"><label>사진 (최대 3장)</label><div class="photo-row" id="photoRow"></div>
+      <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)"></div>
+    <div class="field"><label>메모</label><textarea id="f_memo" placeholder="선택 입력"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="itemDeleteBtn" style="display:none;" onclick="deleteCurrentItem()">삭제</button>
+      <button class="btn btn-primary" onclick="saveItem()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: 상품 상세 ============ -->
+<div class="modal-overlay" id="itemDetailModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2>상품 정보</h2><button class="modal-close" onclick="closeModal('itemDetailModal')">✕</button></div>
+    <div id="itemDetailBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="editCurrentItem()">수정</button>
+      <button class="btn btn-primary" onclick="closeModal('itemDetailModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: 주문내역 추가/수정 ============ -->
+<div class="modal-overlay" id="orderModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2 id="orderModalTitle">주문 등록</h2><button class="modal-close" onclick="closeModal('orderModal')">✕</button></div>
+    <div class="field"><label>주문일</label><input type="date" id="o_date"></div>
+    <div class="field"><label>상품명</label><input type="text" id="o_name" placeholder="예: 니트 가디건"></div>
+    <div class="field-row">
+      <div class="field"><label>칼라</label><input type="text" id="o_color" placeholder="예: 베이지"></div>
+      <div class="field"><label>사이즈</label><input type="text" id="o_size" placeholder="예: M"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>수량</label><input type="number" id="o_qty" value="1"></div>
+      <div class="field"><label>단가 (원)</label><input type="number" id="o_price" placeholder="0"></div>
+    </div>
+    <div class="field"><label>구매처</label><select id="o_wholesaler"><option value="">선택 안함</option></select></div>
+    <div class="field">
+      <label>입고 상태</label>
+      <div class="select-chip-group">
+        <div class="select-chip" id="o_status_done" onclick="setOrderStatus(false)">입고완료</div>
+        <div class="select-chip" id="o_status_back" onclick="setOrderStatus(true)">미송</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="orderDeleteBtn" style="display:none;" onclick="deleteCurrentOrder()">삭제</button>
+      <button class="btn btn-primary" onclick="saveOrder()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: 위시리스트 추가/수정 ============ -->
+<div class="modal-overlay" id="wishModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2 id="wishModalTitle">위시 등록</h2><button class="modal-close" onclick="closeModal('wishModal')">✕</button></div>
+    <div class="field"><label>상품명</label><input type="text" id="wi_name" placeholder="예: 트위드 자켓"></div>
+    <div class="field"><label>예상 가격 (원)</label><input type="number" id="wi_price" placeholder="0"></div>
+    <div class="field"><label>구매처 (선택)</label><select id="wi_wholesaler"><option value="">미지정</option></select></div>
+    <div class="field"><label>메모</label><textarea id="wi_memo" placeholder="선택 입력"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="wishDeleteBtn" style="display:none;" onclick="deleteCurrentWish()">삭제</button>
+      <button class="btn btn-primary" onclick="saveWish()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: 위시 상세 ============ -->
+<div class="modal-overlay" id="wishDetailModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2>위시 상세</h2><button class="modal-close" onclick="closeModal('wishDetailModal')">✕</button></div>
+    <div id="wishDetailBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="editCurrentWish()">수정</button>
+      <button class="btn btn-primary" onclick="convertWishToItem()">구매완료 전환</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: 사입삼촌 추가/수정 ============ -->
+<div class="modal-overlay" id="saipModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2 id="saipModalTitle">사입 신청 등록</h2><button class="modal-close" onclick="closeModal('saipModal')">✕</button></div>
+    <div class="field"><label>사입신청일</label><input type="date" id="sp_date"></div>
+    <div class="field">
+      <label>대납 / 완납</label>
+      <div class="status-toggle-row">
+        <div class="status-toggle on-daenap" id="sp_daenap" onclick="toggleSaipStatus('daenap')">대납</div>
+        <div class="status-toggle on-wannap" id="sp_wannap" onclick="toggleSaipStatus('wannap')">완납</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>상품 목록</label>
+      <div id="saipRows"></div>
+      <button class="btn btn-outline" style="width:100%;" onclick="addSaipRow()">+ 상품 추가</button>
+    </div>
+    <div class="fee-box" id="saipFeePreview"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button class="btn btn-danger" id="saipDeleteBtn" style="display:none;" onclick="deleteCurrentSaip()">삭제</button>
+      <button class="btn btn-primary" onclick="saveSaip()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: 사입삼촌 상세 ============ -->
+<div class="modal-overlay" id="saipDetailModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2>사입 신청 상세</h2><button class="modal-close" onclick="closeModal('saipDetailModal')">✕</button></div>
+    <div id="saipDetailBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="editCurrentSaip()">수정</button>
+      <button class="btn btn-primary" onclick="closeModal('saipDetailModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: 구매처 추가/수정 ============ -->
+<div class="modal-overlay" id="wlModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2 id="wlModalTitle">구매처 등록</h2><button class="modal-close" onclick="closeModal('wlModal')">✕</button></div>
+    <div class="field"><label>상호명</label><input type="text" id="w_name" placeholder="예: 스터닝"></div>
+    <div class="field"><label>건물</label><select id="w_building"></select></div>
+    <div class="field-row">
+      <div class="field"><label>층</label><input type="text" id="w_floor" placeholder="예: 지하1층"></div>
+      <div class="field"><label>호</label><input type="text" id="w_unit" placeholder="예: D14"></div>
+    </div>
+    <div class="field"><label>결제방법</label>
+      <div class="select-chip-group" id="paymentGroup">
+        <div class="select-chip" data-pay="현금" onclick="togglePayment(this)">현금</div>
+        <div class="select-chip" data-pay="카드" onclick="togglePayment(this)">카드</div>
+        <div class="select-chip" data-pay="계좌이체" onclick="togglePayment(this)">계좌이체</div>
+      </div>
+    </div>
+    <div class="field"><label>계좌번호</label><input type="text" id="w_account" placeholder="예: 국민 123456-01-123456"></div>
+    <div class="field"><label>메모</label><textarea id="w_memo" placeholder="예: 카드 결제 불가, 새벽 오픈 등"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" id="wlDeleteBtn" style="display:none;" onclick="deleteCurrentWholesaler()">삭제</button>
+      <button class="btn btn-primary" onclick="saveWholesaler()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: 구매처 상세 ============ -->
+<div class="modal-overlay" id="wlDetailModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2>구매처 정보</h2><button class="modal-close" onclick="closeModal('wlDetailModal')">✕</button></div>
+    <div id="wlDetailBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="editCurrentWholesaler()">수정</button>
+      <button class="btn btn-primary" onclick="closeModal('wlDetailModal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: 건물 추가 ============ -->
+<div class="modal-overlay" id="buildingModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2>건물 추가</h2><button class="modal-close" onclick="closeModal('buildingModal')">✕</button></div>
+    <div class="field"><label>건물명</label><input type="text" id="newBuildingName" placeholder="예: 헤어피스"></div>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="addBuilding()">추가</button></div>
+  </div>
+</div>
+
+<!-- ============ MODAL: 설정 (동기화) ============ -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2>동기화 설정</h2><button class="modal-close" onclick="closeModal('settingsModal')">✕</button></div>
+    <div class="field"><label>JSONBin Bin ID</label><input type="text" id="s_binId" placeholder="예: 6a30d7f6..."></div>
+    <div class="field"><label>JSONBin Master/Access Key</label><input type="text" id="s_apiKey" placeholder="X-Master-Key 값"></div>
+    <div class="settings-sync-info" id="syncInfo">아직 동기화하지 않았어요</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="pullFromCloud(true)">가져오기</button>
+      <button class="btn btn-primary" onclick="saveSettingsAndPush()">저장 &amp; 올리기</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ 데이터 정의 ============ */
+const CATEGORIES = {
+  "의류": ["상의","원피스","팬츠/레깅스","스커트","아우터","홈웨어/언더웨어"],
+  "신발": ["플랫/로퍼","샌들/슬리퍼/쪼리","운동화","부츠"],
+  "가방": ["크로스백","숄더백","토트백","클러치/지갑/파우치","백팩"],
+  "주얼리": ["귀걸이","목걸이","반지","팔찌/발찌"],
+  "잡화": ["헤어액세서리","핸드폰액세서리","여성가방","모자","양말/스타킹","벨트","시계","머플러/스카프","선글라스/안경"]
+};
+const CAT_COLOR = { "의류": "#F5A8D6", "신발": "#E7A97C", "가방": "#BAA6C1", "주얼리": "#E35BA5", "잡화": "#8FB8D6" };
+const BUILDING_COLORS = ["#F5A8D6","#8FB8D6","#E7A97C","#BAA6C1","#7FC7A0","#E35BA5","#C9A6E3"];
+const SAIP_FEE_PER_SHOP = 2000;
+const SAIP_SHIPPING_FEE = 4000;
+
+let state = {
+  items: [],
+  wholesalers: [],
+  buildings: ["디오트"],
+  quotes: [],
+  orders: [],
+  wishes: [],
+  saips: [],
+  settings: { binId:"", apiKey:"", lastSync:null }
+};
+
+let ui = {
+  currentTab: 1,
+  itemCatFilter: "전체",
+  buildingFilter: "전체",
+  orderStatusFilter: "전체",
+  editingItemId: null,
+  editingWlId: null,
+  editingOrderId: null,
+  editingWishId: null,
+  editingSaipId: null,
+  formMajor: null,
+  formMinor: null,
+  formPhotos: [],
+  formPayments: [],
+  formOrderBack: false,
+  formSaipDaenap: false,
+  formSaipWannap: false,
+  formSaipRows: [],
+  viewingItemId: null,
+  viewingWlId: null,
+  viewingWishId: null,
+  viewingSaipId: null
+};
+
+/* ============ 저장/로드 (localStorage) ============ */
+function loadLocal(){
+  try{
+    const raw = localStorage.getItem('wsl_data');
+    if(raw){
+      const parsed = JSON.parse(raw);
+      state = Object.assign(state, parsed);
+      if(!state.buildings || !state.buildings.length) state.buildings = ["디오트"];
+      if(!state.orders) state.orders = [];
+      if(!state.wishes) state.wishes = [];
+      if(!state.saips) state.saips = [];
+    }
+  }catch(e){ console.error(e); }
+}
+function saveLocal(){ localStorage.setItem('wsl_data', JSON.stringify(state)); }
+
+/* ============ 초기화 ============ */
+function init(){
+  loadLocal();
+  document.body.classList.add('bg-tab1');
+  document.getElementById('s_binId').value = state.settings.binId || "";
+  document.getElementById('s_apiKey').value = state.settings.apiKey || "";
+  updateSyncInfo();
+  buildMajorCatChips();
+  renderItemCatFilter();
+  renderBuildingFilter();
+  renderOrderStatusFilter();
+  renderItems();
+  renderWholesalers();
+  renderQuoteWholesalerOptions();
+  renderQuotes();
+  renderOrders();
+  renderWishes();
+  renderSaips();
+  if(state.settings.binId && state.settings.apiKey){ pullFromCloud(false); }
+}
+
+/* ============ 탭 전환 ============ */
+function switchTab(n){
+  ui.currentTab = n;
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+n).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.tab-btn[data-tab="'+n+'"]').classList.add('active');
+  document.getElementById('fabBtn').style.display = (n===3) ? 'none' : 'flex';
+  document.body.classList.remove('bg-tab1','bg-tab2','bg-tab3','bg-tab4','bg-tab5','bg-tab6');
+  document.body.classList.add('bg-tab'+n);
+}
+function handleFab(){
+  if(ui.currentTab === 1) openItemModal();
+  else if(ui.currentTab === 2) openOrderModal();
+  else if(ui.currentTab === 4) openWishModal();
+  else if(ui.currentTab === 5) openSaipModal();
+  else if(ui.currentTab === 6) openWholesalerModal();
+}
+
+/* ============ 공통 ============ */
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function showToast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 1800); }
+function fmtMoney(n){ n = Number(n)||0; return n.toLocaleString('ko-KR') + '원'; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escAttr(s){ return String(s).replace(/'/g,"\\'"); }
+
+/* ============ TAB1: 상품 카테고리 필터 칩 ============ */
+function renderItemCatFilter(){
+  const wrap = document.getElementById('itemCatFilter');
+  const cats = ["전체", ...Object.keys(CATEGORIES)];
+  wrap.innerHTML = cats.map(c=>`<div class="chip ${ui.itemCatFilter===c?'active':''}" onclick="setItemCatFilter('${c}')">${c}</div>`).join('');
+}
+function setItemCatFilter(c){ ui.itemCatFilter = c; renderItemCatFilter(); renderItems(); }
+
+/* ============ TAB1: 상품 리스트 렌더 ============ */
+function renderItems(){
+  const q = document.getElementById('itemSearch').value.trim().toLowerCase();
+  let list = state.items.slice().sort((a,b)=> (b.purchaseDate||'').localeCompare(a.purchaseDate||''));
+  if(ui.itemCatFilter !== '전체') list = list.filter(it=> it.category === ui.itemCatFilter);
+  if(q) list = list.filter(it=> (it.name||'').toLowerCase().includes(q) || (it.color||'').toLowerCase().includes(q) || (it.wholesaler||'').toLowerCase().includes(q));
+  const wrap = document.getElementById('itemList');
+  if(list.length === 0){ wrap.innerHTML = `<div class="empty-state"><div class="emoji">🛍️</div><p>등록된 상품이 없어요</p><p>+ 버튼으로 구매 상품을 추가해보세요</p></div>`; return; }
+  wrap.innerHTML = list.map(it=>{
+    const color = CAT_COLOR[it.category] || '#BAA6C1';
+    const thumb = it.photos && it.photos[0] ? `<img class="item-thumb" src="${it.photos[0]}">` : `<div class="item-thumb empty" style="background:linear-gradient(135deg, ${color}, #fff2)">👗</div>`;
+    return `<div class="item-card" onclick="openItemDetail('${it.id}')">${thumb}
+      <div class="item-info">
+        <div class="item-top"><span class="cat-badge" style="background:${color}">${it.category}${it.subcategory? ' · '+it.subcategory:''}</span></div>
+        <div class="item-name">${escapeHtml(it.name||'(이름없음)')}</div>
+        <div class="item-meta">${escapeHtml(it.wholesaler||'-')} · ${it.purchaseDate||'-'}</div>
+        <div class="item-price">${fmtMoney(it.price)}</div>
+      </div></div>`;
+  }).join('');
+}
+
+/* ============ TAB1: 상품 등록/수정 모달 ============ */
+function buildMajorCatChips(){
+  document.getElementById('majorCatGroup').innerHTML = Object.keys(CATEGORIES).map(c=>`<div class="select-chip" data-major="${c}" onclick="selectMajor('${c}')">${c}</div>`).join('');
+}
+function selectMajor(c){
+  ui.formMajor = c; ui.formMinor = null;
+  document.querySelectorAll('#majorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.major === c));
+  renderMinorChips();
+}
+function renderMinorChips(){
+  const wrap = document.getElementById('minorCatGroup');
+  if(!ui.formMajor){ wrap.innerHTML = '<span style="font-size:12px;color:#b2b2c2;">대분류를 먼저 선택하세요</span>'; return; }
+  const subs = CATEGORIES[ui.formMajor] || [];
+  wrap.innerHTML = subs.map(s=>`<div class="select-chip" data-minor="${s}" onclick="selectMinor('${s}')">${s}</div>`).join('');
+}
+function selectMinor(s){
+  ui.formMinor = s;
+  document.querySelectorAll('#minorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.minor === s));
+}
+function wholesalerOptionsHtml(selected){
+  return '<option value="">선택 안함</option>' + state.wholesalers.map(w=>`<option value="${escapeHtml(w.name)}" ${w.name===selected?'selected':''}>${escapeHtml(w.name)}</option>`).join('');
+}
+function openItemModal(prefill){
+  ui.editingItemId = null; ui.formMajor = null; ui.formMinor = null; ui.formPhotos = [];
+  document.getElementById('itemModalTitle').textContent = '상품 등록';
+  document.getElementById('itemDeleteBtn').style.display = 'none';
+  document.getElementById('f_name').value = prefill?.name || '';
+  document.getElementById('f_price').value = prefill?.price || '';
+  document.getElementById('f_color').value = '';
+  document.getElementById('f_size').value = '';
+  document.getElementById('f_mix').value = '';
+  document.getElementById('f_memo').value = '';
+  document.getElementById('f_date').value = new Date().toISOString().slice(0,10);
+  buildMajorCatChips(); renderMinorChips();
+  document.getElementById('f_wholesaler').innerHTML = wholesalerOptionsHtml(prefill?.wholesaler || '');
+  renderPhotoRow();
+  openModal('itemModal');
+}
+function openItemEdit(id){
+  const it = state.items.find(i=>i.id===id); if(!it) return;
+  ui.editingItemId = id; ui.formMajor = it.category; ui.formMinor = it.subcategory; ui.formPhotos = (it.photos||[]).slice();
+  document.getElementById('itemModalTitle').textContent = '상품 수정';
+  document.getElementById('itemDeleteBtn').style.display = 'block';
+  document.getElementById('f_name').value = it.name || '';
+  document.getElementById('f_price').value = it.price || '';
+  document.getElementById('f_color').value = it.color || '';
+  document.getElementById('f_size').value = it.size || '';
+  document.getElementById('f_mix').value = it.mixRatio || '';
+  document.getElementById('f_memo').value = it.memo || '';
+  document.getElementById('f_date').value = it.purchaseDate || '';
+  buildMajorCatChips();
+  document.querySelectorAll('#majorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.major === it.category));
+  renderMinorChips();
+  document.querySelectorAll('#minorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.minor === it.subcategory));
+  document.getElementById('f_wholesaler').innerHTML = wholesalerOptionsHtml(it.wholesaler || '');
+  renderPhotoRow();
+  openModal('itemModal');
+}
+function renderPhotoRow(){
+  const wrap = document.getElementById('photoRow');
+  let html = ui.formPhotos.map((p,idx)=>`<div class="photo-slot"><img src="${p}"><button class="rm" onclick="removePhoto(${idx}, event)">✕</button></div>`).join('');
+  if(ui.formPhotos.length < 3) html += `<div class="photo-slot" onclick="document.getElementById('photoInput').click()">＋</div>`;
+  wrap.innerHTML = html;
+}
+function removePhoto(idx, e){ e.stopPropagation(); ui.formPhotos.splice(idx,1); renderPhotoRow(); }
+function handlePhotoUpload(e){
+  const file = e.target.files[0]; if(!file) return;
+  compressImage(file, (dataUrl)=>{ if(ui.formPhotos.length < 3) ui.formPhotos.push(dataUrl); renderPhotoRow(); });
+  e.target.value = '';
+}
+function compressImage(file, cb){
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    const img = new Image();
+    img.onload = function(){
+      const maxW = 700; const scale = Math.min(1, maxW / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width * scale; canvas.height = img.height * scale;
+      const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      cb(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function saveItem(){
+  const name = document.getElementById('f_name').value.trim();
+  if(!ui.formMajor){ showToast('대분류를 선택해주세요'); return; }
+  if(!name){ showToast('상품명을 입력해주세요'); return; }
+  const data = {
+    category: ui.formMajor, subcategory: ui.formMinor || '', name,
+    price: Number(document.getElementById('f_price').value)||0,
+    color: document.getElementById('f_color').value.trim(),
+    size: document.getElementById('f_size').value.trim(),
+    mixRatio: document.getElementById('f_mix').value.trim(),
+    wholesaler: document.getElementById('f_wholesaler').value,
+    purchaseDate: document.getElementById('f_date').value,
+    memo: document.getElementById('f_memo').value.trim(),
+    photos: ui.formPhotos.slice()
+  };
+  if(ui.editingItemId){ const idx = state.items.findIndex(i=>i.id===ui.editingItemId); state.items[idx] = Object.assign(state.items[idx], data); }
+  else { data.id = crypto.randomUUID(); state.items.push(data); }
+  saveLocal(); renderItems(); closeModal('itemModal'); showToast('저장했어요'); pushToCloud();
+}
+function deleteCurrentItem(){
+  if(!ui.editingItemId) return;
+  if(!confirm('이 상품을 삭제할까요?')) return;
+  state.items = state.items.filter(i=>i.id!==ui.editingItemId);
+  saveLocal(); renderItems(); closeModal('itemModal'); showToast('삭제했어요'); pushToCloud();
+}
+function openItemDetail(id){
+  const it = state.items.find(i=>i.id===id); if(!it) return;
+  ui.viewingItemId = id;
+  const color = CAT_COLOR[it.category] || '#BAA6C1';
+  let photoHtml = it.photos && it.photos.length ? `<div class="detail-photo-scroll">${it.photos.map(p=>`<img src="${p}">`).join('')}</div>` : '';
+  document.getElementById('itemDetailBody').innerHTML = `${photoHtml}
+    <div style="margin-bottom:10px;"><span class="cat-badge" style="background:${color}">${it.category}${it.subcategory?' · '+it.subcategory:''}</span></div>
+    <div class="detail-row"><span class="k">상품명</span><span class="v">${escapeHtml(it.name)}</span></div>
+    <div class="detail-row"><span class="k">금액</span><span class="v">${fmtMoney(it.price)}</span></div>
+    <div class="detail-row"><span class="k">색상</span><span class="v">${escapeHtml(it.color||'-')}</span></div>
+    <div class="detail-row"><span class="k">사이즈</span><span class="v">${escapeHtml(it.size||'-')}</span></div>
+    <div class="detail-row"><span class="k">혼용률</span><span class="v">${escapeHtml(it.mixRatio||'-')}</span></div>
+    <div class="detail-row"><span class="k">구매처</span><span class="v">${escapeHtml(it.wholesaler||'-')}</span></div>
+    <div class="detail-row"><span class="k">구매일</span><span class="v">${it.purchaseDate||'-'}</span></div>
+    ${it.memo ? `<div class="detail-row"><span class="k">메모</span><span class="v">${escapeHtml(it.memo)}</span></div>` : ''}`;
+  openModal('itemDetailModal');
+}
+function editCurrentItem(){ closeModal('itemDetailModal'); openItemEdit(ui.viewingItemId); }
+
+/* ============ TAB2: 주문내역 ============ */
+function renderOrderStatusFilter(){
+  const wrap = document.getElementById('orderStatusFilter');
+  const opts = ["전체","미송만","입고완료"];
+  wrap.innerHTML = opts.map(o=>`<div class="chip ${ui.orderStatusFilter===o?'active':''}" onclick="setOrderStatusFilter('${o}')">${o}</div>`).join('');
+}
+function setOrderStatusFilter(o){ ui.orderStatusFilter = o; renderOrderStatusFilter(); renderOrders(); }
+function renderOrders(){
+  const q = document.getElementById('orderSearch').value.trim().toLowerCase();
+  let list = state.orders.slice().sort((a,b)=> (b.orderDate||'').localeCompare(a.orderDate||''));
+  if(ui.orderStatusFilter === '미송만') list = list.filter(o=>o.backorder);
+  if(ui.orderStatusFilter === '입고완료') list = list.filter(o=>!o.backorder);
+  if(q) list = list.filter(o=> (o.name||'').toLowerCase().includes(q) || (o.wholesaler||'').toLowerCase().includes(q));
+  const wrap = document.getElementById('orderList');
+  if(list.length===0){ wrap.innerHTML = `<div class="empty-state"><div class="emoji">📦</div><p>등록된 주문이 없어요</p><p>+ 버튼으로 주문을 추가해보세요</p></div>`; return; }
+  let html = ''; let lastDate = null;
+  list.forEach(o=>{
+    if(o.orderDate !== lastDate){ html += `<div class="order-date-head">${o.orderDate||'날짜 미지정'}</div>`; lastDate = o.orderDate; }
+    const opt = [o.color, o.size].filter(Boolean).join(' / ');
+    html += `<div class="order-line" onclick="openOrderEdit('${o.id}')">
+      <div class="ol-info">
+        <div class="ol-name">${escapeHtml(o.name)}</div>
+        ${opt ? `<div class="ol-opt">${escapeHtml(opt)}</div>` : ''}
+        <div class="ol-sub">${escapeHtml(o.wholesaler||'-')} · ${fmtMoney(o.price)} × ${o.qty}</div>
+      </div>
+      <div class="status-chip ${o.backorder?'back':'done'}" onclick="toggleOrderStatus(event,'${o.id}')">${o.backorder?'미송':'입고완료'}</div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+}
+function toggleOrderStatus(e, id){
+  e.stopPropagation();
+  const o = state.orders.find(x=>x.id===id); if(!o) return;
+  o.backorder = !o.backorder;
+  saveLocal(); renderOrders(); pushToCloud();
+}
+function setOrderStatus(back){
+  ui.formOrderBack = back;
+  document.getElementById('o_status_done').classList.toggle('sel', !back);
+  document.getElementById('o_status_back').classList.toggle('sel', back);
+}
+function openOrderModal(){
+  ui.editingOrderId = null; ui.formOrderBack = false;
+  document.getElementById('orderModalTitle').textContent = '주문 등록';
+  document.getElementById('orderDeleteBtn').style.display = 'none';
+  document.getElementById('o_date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('o_name').value = '';
+  document.getElementById('o_color').value = '';
+  document.getElementById('o_size').value = '';
+  document.getElementById('o_qty').value = '1';
+  document.getElementById('o_price').value = '';
+  document.getElementById('o_wholesaler').innerHTML = wholesalerOptionsHtml('');
+  setOrderStatus(false);
+  openModal('orderModal');
+}
+function openOrderEdit(id){
+  const o = state.orders.find(x=>x.id===id); if(!o) return;
+  ui.editingOrderId = id; ui.formOrderBack = !!o.backorder;
+  document.getElementById('orderModalTitle').textContent = '주문 수정';
+  document.getElementById('orderDeleteBtn').style.display = 'block';
+  document.getElementById('o_date').value = o.orderDate || '';
+  document.getElementById('o_name').value = o.name || '';
+  document.getElementById('o_color').value = o.color || '';
+  document.getElementById('o_size').value = o.size || '';
+  document.getElementById('o_qty').value = o.qty || 1;
+  document.getElementById('o_price').value = o.price || '';
+  document.getElementById('o_wholesaler').innerHTML = wholesalerOptionsHtml(o.wholesaler || '');
+  setOrderStatus(o.backorder);
+  openModal('orderModal');
+}
+function saveOrder(){
+  const name = document.getElementById('o_name').value.trim();
+  if(!name){ showToast('상품명을 입력해주세요'); return; }
+  const data = {
+    orderDate: document.getElementById('o_date').value,
+    name, color: document.getElementById('o_color').value.trim(), size: document.getElementById('o_size').value.trim(),
+    qty: Number(document.getElementById('o_qty').value)||1, price: Number(document.getElementById('o_price').value)||0,
+    wholesaler: document.getElementById('o_wholesaler').value, backorder: ui.formOrderBack
+  };
+  if(ui.editingOrderId){ const idx = state.orders.findIndex(o=>o.id===ui.editingOrderId); state.orders[idx] = Object.assign(state.orders[idx], data); }
+  else { data.id = crypto.randomUUID(); state.orders.push(data); }
+  saveLocal(); renderOrders(); closeModal('orderModal'); showToast('저장했어요'); pushToCloud();
+}
+function deleteCurrentOrder(){
+  if(!ui.editingOrderId) return;
+  if(!confirm('이 주문을 삭제할까요?')) return;
+  state.orders = state.orders.filter(o=>o.id!==ui.editingOrderId);
+  saveLocal(); renderOrders(); closeModal('orderModal'); showToast('삭제했어요'); pushToCloud();
+}
+
+/* ============ TAB4: 위시리스트 ============ */
+function renderWishes(){
+  const q = document.getElementById('wishSearch').value.trim().toLowerCase();
+  let list = state.wishes.slice().sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+  if(q) list = list.filter(w=> (w.name||'').toLowerCase().includes(q) || (w.wholesaler||'').toLowerCase().includes(q));
+  const wrap = document.getElementById('wishList');
+  if(list.length===0){ wrap.innerHTML = `<div class="empty-state"><div class="emoji">⭐</div><p>찜해둔 상품이 없어요</p><p>+ 버튼으로 위시리스트를 추가해보세요</p></div>`; return; }
+  wrap.innerHTML = list.map(w=>`
+    <div class="wish-card" onclick="openWishDetail('${w.id}')">
+      <div class="wish-emoji">⭐</div>
+      <div class="wish-info">
+        <div class="wi-name">${escapeHtml(w.name)}</div>
+        <div class="wi-sub">${escapeHtml(w.wholesaler||'구매처 미지정')}</div>
+        <div class="wi-price">${fmtMoney(w.price)}</div>
+      </div>
+    </div>`).join('');
+}
+function openWishModal(){
+  ui.editingWishId = null;
+  document.getElementById('wishModalTitle').textContent = '위시 등록';
+  document.getElementById('wishDeleteBtn').style.display = 'none';
+  document.getElementById('wi_name').value = '';
+  document.getElementById('wi_price').value = '';
+  document.getElementById('wi_memo').value = '';
+  document.getElementById('wi_wholesaler').innerHTML = wholesalerOptionsHtml('').replace('선택 안함','미지정');
+  openModal('wishModal');
+}
+function openWishEdit(id){
+  const w = state.wishes.find(x=>x.id===id); if(!w) return;
+  ui.editingWishId = id;
+  document.getElementById('wishModalTitle').textContent = '위시 수정';
+  document.getElementById('wishDeleteBtn').style.display = 'block';
+  document.getElementById('wi_name').value = w.name || '';
+  document.getElementById('wi_price').value = w.price || '';
+  document.getElementById('wi_memo').value = w.memo || '';
+  document.getElementById('wi_wholesaler').innerHTML = wholesalerOptionsHtml(w.wholesaler || '').replace('선택 안함','미지정');
+  openModal('wishModal');
+}
+function saveWish(){
+  const name = document.getElementById('wi_name').value.trim();
+  if(!name){ showToast('상품명을 입력해주세요'); return; }
+  const data = {
+    name, price: Number(document.getElementById('wi_price').value)||0,
+    wholesaler: document.getElementById('wi_wholesaler').value,
+    memo: document.getElementById('wi_memo').value.trim()
+  };
+  if(ui.editingWishId){ const idx = state.wishes.findIndex(w=>w.id===ui.editingWishId); state.wishes[idx] = Object.assign(state.wishes[idx], data); }
+  else { data.id = crypto.randomUUID(); data.createdAt = Date.now(); state.wishes.push(data); }
+  saveLocal(); renderWishes(); closeModal('wishModal'); showToast('저장했어요'); pushToCloud();
+}
+function deleteCurrentWish(){
+  if(!ui.editingWishId) return;
+  if(!confirm('이 위시를 삭제할까요?')) return;
+  state.wishes = state.wishes.filter(w=>w.id!==ui.editingWishId);
+  saveLocal(); renderWishes(); closeModal('wishModal'); showToast('삭제했어요'); pushToCloud();
+}
+function openWishDetail(id){
+  const w = state.wishes.find(x=>x.id===id); if(!w) return;
+  ui.viewingWishId = id;
+  document.getElementById('wishDetailBody').innerHTML = `
+    <div class="detail-row"><span class="k">상품명</span><span class="v">${escapeHtml(w.name)}</span></div>
+    <div class="detail-row"><span class="k">예상가격</span><span class="v">${fmtMoney(w.price)}</span></div>
+    <div class="detail-row"><span class="k">구매처</span><span class="v">${escapeHtml(w.wholesaler||'-')}</span></div>
+    ${w.memo ? `<div class="detail-row"><span class="k">메모</span><span class="v">${escapeHtml(w.memo)}</span></div>` : ''}`;
+  openModal('wishDetailModal');
+}
+function editCurrentWish(){ closeModal('wishDetailModal'); openWishEdit(ui.viewingWishId); }
+function convertWishToItem(){
+  const id = ui.viewingWishId || ui.editingWishId;
+  const w = state.wishes.find(x=>x.id===id);
+  if(!w){ showToast('전환할 위시를 찾을 수 없어요'); return; }
+  closeModal('wishDetailModal'); closeModal('wishModal');
+  state.wishes = state.wishes.filter(x=>x.id!==id);
+  saveLocal(); renderWishes(); pushToCloud();
+  switchTab(1);
+  openItemModal({ name: w.name, price: w.price, wholesaler: w.wholesaler });
+  showToast('구매완료 탭에서 마저 입력해주세요');
+}
+
+/* ============ TAB5: 사입삼촌 ============ */
+function toggleSaipStatus(type){
+  if(type==='daenap'){ ui.formSaipDaenap = !ui.formSaipDaenap; document.getElementById('sp_daenap').classList.toggle('sel', ui.formSaipDaenap); }
+  else { ui.formSaipWannap = !ui.formSaipWannap; document.getElementById('sp_wannap').classList.toggle('sel', ui.formSaipWannap); }
+}
+function addSaipRow(row){
+  ui.formSaipRows.push(row || { id: crypto.randomUUID(), name:'', price:'', color:'', size:'', shopName:'', building:'', floor:'', unit:'' });
+  renderSaipRows();
+}
+function removeSaipRow(id){
+  ui.formSaipRows = ui.formSaipRows.filter(r=>r.id!==id);
+  if(ui.formSaipRows.length===0) addSaipRow();
+  renderSaipRows();
+}
+function updateSaipRow(id, field, val){
+  const r = ui.formSaipRows.find(x=>x.id===id);
+  if(r){ r[field] = val; updateSaipFeePreview(); }
+}
+function renderSaipRows(){
+  const wrap = document.getElementById('saipRows');
+  wrap.innerHTML = ui.formSaipRows.map((r,idx)=>`
+    <div class="saip-row">
+      <div class="row-num">상품 ${idx+1}</div>
+      ${ui.formSaipRows.length>1 ? `<button class="row-del" onclick="removeSaipRow('${r.id}')">✕</button>` : ''}
+      <div class="field-row" style="margin-bottom:8px;">
+        <div class="field" style="margin-bottom:0;"><label>상품명</label><input type="text" value="${escapeHtml(r.name)}" oninput="updateSaipRow('${r.id}','name',this.value)" placeholder="상품명"></div>
+        <div class="field" style="margin-bottom:0;"><label>가격(₩)</label><input type="number" value="${r.price}" oninput="updateSaipRow('${r.id}','price',this.value)" placeholder="0"></div>
+      </div>
+      <div class="field-row" style="margin-bottom:8px;">
+        <div class="field" style="margin-bottom:0;"><label>칼라</label><input type="text" value="${escapeHtml(r.color)}" oninput="updateSaipRow('${r.id}','color',this.value)" placeholder="칼라"></div>
+        <div class="field" style="margin-bottom:0;"><label>사이즈</label><input type="text" value="${escapeHtml(r.size)}" oninput="updateSaipRow('${r.id}','size',this.value)" placeholder="사이즈"></div>
+      </div>
+      <div class="field" style="margin-bottom:8px;"><label>상호명</label><input type="text" value="${escapeHtml(r.shopName)}" oninput="updateSaipRow('${r.id}','shopName',this.value)" placeholder="상호명"></div>
+      <div class="field-row">
+        <div class="field" style="margin-bottom:0;"><label>건물</label><input type="text" value="${escapeHtml(r.building)}" oninput="updateSaipRow('${r.id}','building',this.value)" placeholder="건물"></div>
+        <div class="field" style="margin-bottom:0;"><label>층</label><input type="text" value="${escapeHtml(r.floor)}" oninput="updateSaipRow('${r.id}','floor',this.value)" placeholder="층"></div>
+        <div class="field" style="margin-bottom:0;"><label>호</label><input type="text" value="${escapeHtml(r.unit)}" oninput="updateSaipRow('${r.id}','unit',this.value)" placeholder="호"></div>
+      </div>
+    </div>`).join('');
+  updateSaipFeePreview();
+}
+function calcSaipFee(rows){
+  const itemTotal = rows.reduce((s,r)=> s + (Number(r.price)||0), 0);
+  const shopSet = new Set(rows.map(r=> (r.shopName||'').trim()).filter(Boolean));
+  const shopCount = shopSet.size;
+  const fee = shopCount * SAIP_FEE_PER_SHOP + (rows.length ? SAIP_SHIPPING_FEE : 0);
+  return { itemTotal, shopCount, fee, grandTotal: itemTotal + fee };
+}
+function updateSaipFeePreview(){
+  const r = calcSaipFee(ui.formSaipRows);
+  document.getElementById('saipFeePreview').innerHTML = `
+    <div class="fee-row"><span>상품 금액 합계</span><span>${fmtMoney(r.itemTotal)}</span></div>
+    <div class="fee-row"><span>거래처 수수료 (${r.shopCount}곳 × 2,000원)</span><span>${fmtMoney(r.shopCount*SAIP_FEE_PER_SHOP)}</span></div>
+    <div class="fee-row"><span>택배비</span><span>${fmtMoney(ui.formSaipRows.length?SAIP_SHIPPING_FEE:0)}</span></div>
+    <div class="fee-row total"><span>총 결제금액</span><span>${fmtMoney(r.grandTotal)}</span></div>`;
+}
+function openSaipModal(){
+  ui.editingSaipId = null; ui.formSaipDaenap = false; ui.formSaipWannap = false; ui.formSaipRows = [];
+  document.getElementById('saipModalTitle').textContent = '사입 신청 등록';
+  document.getElementById('saipDeleteBtn').style.display = 'none';
+  document.getElementById('sp_date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('sp_daenap').classList.remove('sel');
+  document.getElementById('sp_wannap').classList.remove('sel');
+  addSaipRow();
+  openModal('saipModal');
+}
+function openSaipEdit(id){
+  const s = state.saips.find(x=>x.id===id); if(!s) return;
+  ui.editingSaipId = id; ui.formSaipDaenap = !!s.daenap; ui.formSaipWannap = !!s.wannap;
+  ui.formSaipRows = (s.items||[]).map(it=>Object.assign({id:crypto.randomUUID()}, it));
+  document.getElementById('saipModalTitle').textContent = '사입 신청 수정';
+  document.getElementById('saipDeleteBtn').style.display = 'block';
+  document.getElementById('sp_date').value = s.applyDate || '';
+  document.getElementById('sp_daenap').classList.toggle('sel', ui.formSaipDaenap);
+  document.getElementById('sp_wannap').classList.toggle('sel', ui.formSaipWannap);
+  if(ui.formSaipRows.length===0) addSaipRow(); else renderSaipRows();
+  openModal('saipModal');
+}
+function saveSaip(){
+  if(ui.formSaipRows.every(r=>!r.name.trim())){ showToast('상품을 1개 이상 입력해주세요'); return; }
+  const items = ui.formSaipRows.filter(r=>r.name.trim()).map(r=>({
+    name:r.name.trim(), price:Number(r.price)||0, color:r.color.trim(), size:r.size.trim(),
+    shopName:r.shopName.trim(), building:r.building.trim(), floor:r.floor.trim(), unit:r.unit.trim()
+  }));
+  const data = { applyDate: document.getElementById('sp_date').value, items, daenap: ui.formSaipDaenap, wannap: ui.formSaipWannap };
+  if(ui.editingSaipId){ const idx = state.saips.findIndex(s=>s.id===ui.editingSaipId); state.saips[idx] = Object.assign(state.saips[idx], data); }
+  else { data.id = crypto.randomUUID(); state.saips.push(data); }
+  saveLocal(); renderSaips(); closeModal('saipModal'); showToast('저장했어요'); pushToCloud();
+}
+function deleteCurrentSaip(){
+  if(!ui.editingSaipId) return;
+  if(!confirm('이 사입 신청건을 삭제할까요?')) return;
+  state.saips = state.saips.filter(s=>s.id!==ui.editingSaipId);
+  saveLocal(); renderSaips(); closeModal('saipModal'); showToast('삭제했어요'); pushToCloud();
+}
+function renderSaips(){
+  const q = document.getElementById('saipSearch').value.trim().toLowerCase();
+  let list = state.saips.slice().sort((a,b)=> (b.applyDate||'').localeCompare(a.applyDate||''));
+  if(q) list = list.filter(s=> (s.applyDate||'').includes(q) || (s.items||[]).some(it=>(it.shopName||'').toLowerCase().includes(q)));
+  const wrap = document.getElementById('saipList');
+  if(list.length===0){ wrap.innerHTML = `<div class="empty-state"><div class="emoji">🧾</div><p>등록된 사입 신청이 없어요</p><p>+ 버튼으로 신청건을 추가해보세요</p></div>`; return; }
+  wrap.innerHTML = list.map(s=>{
+    const r = calcSaipFee(s.items||[]);
+    let badges = '';
+    if(s.daenap) badges += `<span class="b-daenap">대납</span>`;
+    if(s.wannap) badges += `<span class="b-wannap">완납</span>`;
+    if(!s.daenap && !s.wannap) badges += `<span class="b-none">미정산</span>`;
+    return `<div class="saip-card" onclick="openSaipDetail('${s.id}')">
+      <div class="saip-top"><span class="saip-date">${s.applyDate||'날짜 미지정'}</span><span class="saip-badges">${badges}</span></div>
+      <div class="saip-meta">상품 ${((s.items||[]).length)}건 · 거래처 ${r.shopCount}곳</div>
+      <div class="saip-total">${fmtMoney(r.grandTotal)}</div>
+    </div>`;
+  }).join('');
+}
+function openSaipDetail(id){
+  const s = state.saips.find(x=>x.id===id); if(!s) return;
+  ui.viewingSaipId = id;
+  const r = calcSaipFee(s.items||[]);
+  const itemsHtml = (s.items||[]).map(it=>{
+    const opt = [it.color, it.size].filter(Boolean).join(' / ');
+    const loc = [it.building, it.floor, it.unit].filter(Boolean).join(' ');
+    return `<div class="sit-row">
+      <div class="sit-name">${escapeHtml(it.name)} · ${fmtMoney(it.price)}</div>
+      <div class="sit-sub">${opt ? escapeHtml(opt)+' · ' : ''}${escapeHtml(it.shopName||'-')} ${loc ? '('+escapeHtml(loc)+')' : ''}</div>
+    </div>`;
+  }).join('');
+  let badges = '';
+  if(s.daenap) badges += `<span class="b-daenap">대납</span>`;
+  if(s.wannap) badges += `<span class="b-wannap">완납</span>`;
+  if(!s.daenap && !s.wannap) badges += `<span class="b-none">미정산</span>`;
+  document.getElementById('saipDetailBody').innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+      <span style="font-size:16px; font-weight:800; color:var(--navy);">${s.applyDate||'날짜 미지정'}</span>
+      <span>${badges}</span>
+    </div>
+    <div class="saip-item-table">${itemsHtml}</div>
+    <div class="fee-box" style="margin-top:12px;">
+      <div class="fee-row"><span>상품 금액 합계</span><span>${fmtMoney(r.itemTotal)}</span></div>
+      <div class="fee-row"><span>거래처 수수료 (${r.shopCount}곳 × 2,000원)</span><span>${fmtMoney(r.shopCount*SAIP_FEE_PER_SHOP)}</span></div>
+      <div class="fee-row"><span>택배비</span><span>${fmtMoney((s.items||[]).length?SAIP_SHIPPING_FEE:0)}</span></div>
+      <div class="fee-row total"><span>총 결제금액</span><span>${fmtMoney(r.grandTotal)}</span></div>
+    </div>`;
+  openModal('saipDetailModal');
+}
+function editCurrentSaip(){ closeModal('saipDetailModal'); openSaipEdit(ui.viewingSaipId); }
+
+/* ============ TAB6: 건물 필터 / 구매처 리스트 ============ */
+function renderBuildingFilter(){
+  const wrap = document.getElementById('buildingFilter');
+  const list = ["전체", ...state.buildings];
+  wrap.innerHTML = list.map(b=>`<div class="chip ${ui.buildingFilter===b?'active':''}" onclick="setBuildingFilter('${escAttr(b)}')">${b}</div>`).join('') + `<div class="chip add-chip" onclick="openModal('buildingModal')">+ 건물추가</div>`;
+}
+function setBuildingFilter(b){ ui.buildingFilter = b; renderBuildingFilter(); renderWholesalers(); }
+function addBuilding(){
+  const name = document.getElementById('newBuildingName').value.trim();
+  if(!name){ showToast('건물명을 입력해주세요'); return; }
+  if(state.buildings.includes(name)){ showToast('이미 있는 건물이에요'); return; }
+  state.buildings.push(name); saveLocal();
+  document.getElementById('newBuildingName').value = '';
+  renderBuildingFilter(); renderBuildingSelect(); closeModal('buildingModal'); showToast('건물을 추가했어요'); pushToCloud();
+}
+function buildingColor(name){
+  let hash = 0; for(let i=0;i<name.length;i++) hash = name.charCodeAt(i) + ((hash<<5)-hash);
+  return BUILDING_COLORS[Math.abs(hash) % BUILDING_COLORS.length];
+}
+function renderWholesalers(){
+  const q = document.getElementById('wlSearch').value.trim().toLowerCase();
+  let list = state.wholesalers.slice().sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+  if(ui.buildingFilter !== '전체') list = list.filter(w=> w.building === ui.buildingFilter);
+  if(q) list = list.filter(w=> (w.name||'').toLowerCase().includes(q) || (w.building||'').toLowerCase().includes(q));
+  const wrap = document.getElementById('wlList');
+  if(list.length===0){ wrap.innerHTML = `<div class="empty-state"><div class="emoji">🏬</div><p>등록된 구매처가 없어요</p><p>+ 버튼으로 구매처를 추가해보세요</p></div>`; return; }
+  wrap.innerHTML = list.map(w=>`
+    <div class="wl-card" onclick="openWlDetail('${w.id}')">
+      <div class="wl-dot" style="background:${buildingColor(w.building||'')}"></div>
+      <div class="wl-text"><div class="wl-name">${escapeHtml(w.name)}</div><div class="wl-loc">${escapeHtml(w.building||'-')} ${escapeHtml(w.floor||'')} ${escapeHtml(w.unit||'')}</div></div>
+      <div class="wl-arrow">›</div>
+    </div>`).join('');
+}
+function renderBuildingSelect(selected){
+  const sel = document.getElementById('w_building');
+  sel.innerHTML = state.buildings.map(b=>`<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('');
+  if(selected) sel.value = selected;
+}
+function togglePayment(el){
+  el.classList.toggle('sel');
+  const pay = el.dataset.pay;
+  if(ui.formPayments.includes(pay)) ui.formPayments = ui.formPayments.filter(p=>p!==pay);
+  else ui.formPayments.push(pay);
+}
+function openWholesalerModal(){
+  ui.editingWlId = null; ui.formPayments = [];
+  document.getElementById('wlModalTitle').textContent = '구매처 등록';
+  document.getElementById('wlDeleteBtn').style.display = 'none';
+  document.getElementById('w_name').value = '';
+  document.getElementById('w_floor').value = '';
+  document.getElementById('w_unit').value = '';
+  document.getElementById('w_account').value = '';
+  document.getElementById('w_memo').value = '';
+  document.querySelectorAll('#paymentGroup .select-chip').forEach(el=>el.classList.remove('sel'));
+  renderBuildingSelect();
+  openModal('wlModal');
+}
+function openWlEdit(id){
+  const w = state.wholesalers.find(x=>x.id===id); if(!w) return;
+  ui.editingWlId = id; ui.formPayments = (w.payment||[]).slice();
+  document.getElementById('wlModalTitle').textContent = '구매처 수정';
+  document.getElementById('wlDeleteBtn').style.display = 'block';
+  document.getElementById('w_name').value = w.name||'';
+  document.getElementById('w_floor').value = w.floor||'';
+  document.getElementById('w_unit').value = w.unit||'';
+  document.getElementById('w_account').value = w.account||'';
+  document.getElementById('w_memo').value = w.memo||'';
+  renderBuildingSelect(w.building);
+  document.querySelectorAll('#paymentGroup .select-chip').forEach(el=> el.classList.toggle('sel', ui.formPayments.includes(el.dataset.pay)));
+  openModal('wlModal');
+}
+function saveWholesaler(){
+  const name = document.getElementById('w_name').value.trim();
+  if(!name){ showToast('상호명을 입력해주세요'); return; }
+  const data = {
+    name, building: document.getElementById('w_building').value,
+    floor: document.getElementById('w_floor').value.trim(), unit: document.getElementById('w_unit').value.trim(),
+    payment: ui.formPayments.slice(), account: document.getElementById('w_account').value.trim(),
+    memo: document.getElementById('w_memo').value.trim()
+  };
+  if(ui.editingWlId){ const idx = state.wholesalers.findIndex(w=>w.id===ui.editingWlId); state.wholesalers[idx] = Object.assign(state.wholesalers[idx], data); }
+  else { data.id = crypto.randomUUID(); state.wholesalers.push(data); }
+  saveLocal(); renderWholesalers(); renderQuoteWholesalerOptions(); closeModal('wlModal'); showToast('저장했어요'); pushToCloud();
+}
+function deleteCurrentWholesaler(){
+  if(!ui.editingWlId) return;
+  if(!confirm('이 구매처를 삭제할까요?')) return;
+  state.wholesalers = state.wholesalers.filter(w=>w.id!==ui.editingWlId);
+  saveLocal(); renderWholesalers(); renderQuoteWholesalerOptions(); closeModal('wlModal'); showToast('삭제했어요'); pushToCloud();
+}
+function openWlDetail(id){
+  const w = state.wholesalers.find(x=>x.id===id); if(!w) return;
+  ui.viewingWlId = id;
+  const payHtml = (w.payment&&w.payment.length) ? w.payment.map(p=>`<span class="badge-pay">${p}</span>`).join('') : '<span style="font-size:12.5px;color:#b2b2c2;">등록된 결제방법 없음</span>';
+  document.getElementById('wlDetailBody').innerHTML = `
+    <div style="font-size:20px; font-weight:800; color:var(--navy); margin-bottom:4px;">${escapeHtml(w.name)}</div>
+    <div style="font-size:12px; color:var(--gray); margin-bottom:16px;">${escapeHtml(w.building||'-')} ${escapeHtml(w.floor||'')} ${escapeHtml(w.unit||'')}</div>
+    <div class="detail-row"><span class="k">건물</span><span class="v">${escapeHtml(w.building||'-')}</span></div>
+    <div class="detail-row"><span class="k">층</span><span class="v">${escapeHtml(w.floor||'-')}</span></div>
+    <div class="detail-row"><span class="k">호</span><span class="v">${escapeHtml(w.unit||'-')}</span></div>
+    <div style="margin-top:12px;"><div style="font-size:12px; color:var(--gray); font-weight:600; margin-bottom:6px;">결제방법</div>${payHtml}</div>
+    <div style="margin-top:14px;"><div style="font-size:12px; color:var(--gray); font-weight:600; margin-bottom:6px;">계좌번호</div>
+      <div class="account-box"><span class="num">${escapeHtml(w.account||'등록된 계좌 없음')}</span>${w.account ? `<button class="copy-btn" onclick="copyAccount('${escAttr(w.account)}')">복사</button>` : ''}</div>
+    </div>
+    ${w.memo ? `<div style="margin-top:14px;"><div style="font-size:12px;color:var(--gray);font-weight:600;margin-bottom:4px;">메모</div><div style="font-size:13px;color:var(--navy);">${escapeHtml(w.memo)}</div></div>` : ''}`;
+  openModal('wlDetailModal');
+}
+function editCurrentWholesaler(){ closeModal('wlDetailModal'); openWlEdit(ui.viewingWlId); }
+function copyAccount(acc){ navigator.clipboard.writeText(acc).then(()=>showToast('계좌번호를 복사했어요')); }
+
+/* ============ TAB3: 견적 계산기 ============ */
+function renderQuoteWholesalerOptions(){
+  const sel = document.getElementById('qWholesaler');
+  sel.innerHTML = '<option value="">미지정</option>' + state.wholesalers.map(w=>`<option value="${escapeHtml(w.name)}">${escapeHtml(w.name)}</option>`).join('');
+}
+function addQuoteItem(){
+  const name = document.getElementById('qName').value.trim();
+  const price = Number(document.getElementById('qPrice').value)||0;
+  const qty = Number(document.getElementById('qQty').value)||1;
+  const wholesaler = document.getElementById('qWholesaler').value;
+  if(!name){ showToast('상품명을 입력해주세요'); return; }
+  state.quotes.push({ id: crypto.randomUUID(), name, price, qty, wholesaler });
+  saveLocal();
+  document.getElementById('qName').value=''; document.getElementById('qPrice').value=''; document.getElementById('qQty').value='1'; document.getElementById('qWholesaler').value='';
+  renderQuotes(); pushToCloud();
+}
+function removeQuoteItem(id){ state.quotes = state.quotes.filter(q=>q.id!==id); saveLocal(); renderQuotes(); pushToCloud(); }
+function renderQuotes(){
+  const wrap = document.getElementById('quoteList'); const emptyEl = document.getElementById('quoteEmpty');
+  if(state.quotes.length===0){ wrap.innerHTML = ''; emptyEl.style.display = 'block'; removeTotalBar(); return; }
+  emptyEl.style.display = 'none';
+  const groups = {};
+  state.quotes.forEach(q=>{ const key = q.wholesaler || '미지정'; if(!groups[key]) groups[key] = []; groups[key].push(q); });
+  let html = ''; let grandTotal = 0;
+  Object.keys(groups).forEach(key=>{
+    const items = groups[key]; let subtotal = 0;
+    let itemsHtml = items.map(q=>{
+      const lineTotal = q.price * q.qty; subtotal += lineTotal;
+      return `<div class="quote-item"><div class="qi-info"><div class="qi-name">${escapeHtml(q.name)}</div><div class="qi-sub">${fmtMoney(q.price)} × ${q.qty}</div></div><div class="qi-total">${fmtMoney(lineTotal)}</div><button class="qi-del" onclick="removeQuoteItem('${q.id}')">✕</button></div>`;
+    }).join('');
+    grandTotal += subtotal;
+    html += `<div class="quote-group"><div class="quote-group-head"><span>${escapeHtml(key)}</span><span class="sub-total">${fmtMoney(subtotal)}</span></div>${itemsHtml}</div>`;
+  });
+  wrap.innerHTML = html;
+  renderTotalBar(grandTotal);
+}
+function renderTotalBar(total){
+  let bar = document.getElementById('quoteTotalBar');
+  if(!bar){ bar = document.createElement('div'); bar.id = 'quoteTotalBar'; bar.className = 'quote-total-bar'; document.getElementById('panel-3').appendChild(bar); }
+  bar.innerHTML = `<div><div class="label">총 합계 (${state.quotes.length}개)</div><div class="amount">${fmtMoney(total)}</div></div><button onclick="clearQuotes()">전체 초기화</button>`;
+}
+function removeTotalBar(){ const bar = document.getElementById('quoteTotalBar'); if(bar) bar.remove(); }
+function clearQuotes(){ if(!confirm('후보 리스트를 모두 지울까요?')) return; state.quotes = []; saveLocal(); renderQuotes(); pushToCloud(); }
+
+/* ============ 설정 / JSONBin 동기화 ============ */
+function openSettings(){
+  document.getElementById('s_binId').value = state.settings.binId || "";
+  document.getElementById('s_apiKey').value = state.settings.apiKey || "";
+  updateSyncInfo(); openModal('settingsModal');
+}
+function updateSyncInfo(){
+  document.getElementById('syncInfo').textContent = state.settings.lastSync ? `마지막 동기화: ${new Date(state.settings.lastSync).toLocaleString('ko-KR')}` : '아직 동기화하지 않았어요';
+}
+function saveSettingsAndPush(){
+  state.settings.binId = document.getElementById('s_binId').value.trim();
+  state.settings.apiKey = document.getElementById('s_apiKey').value.trim();
+  saveLocal();
+  if(state.settings.binId && state.settings.apiKey) pushToCloud(true);
+  closeModal('settingsModal');
+}
+async function pushToCloud(silent){
+  if(!state.settings.binId || !state.settings.apiKey) return;
+  try{
+    const payload = { items: state.items, wholesalers: state.wholesalers, buildings: state.buildings, quotes: state.quotes, orders: state.orders, wishes: state.wishes, saips: state.saips };
+    const res = await fetch('https://api.jsonbin.io/v3/b/'+state.settings.binId, {
+      method:'PUT', headers:{ 'Content-Type':'application/json', 'X-Master-Key': state.settings.apiKey }, body: JSON.stringify(payload)
+    });
+    if(res.ok){ state.settings.lastSync = Date.now(); saveLocal(); updateSyncInfo(); if(!silent) showToast('클라우드에 저장했어요'); }
+    else { if(!silent) showToast('동기화 실패 (Bin ID/Key 확인)'); }
+  }catch(e){ if(!silent) showToast('네트워크 오류로 동기화 실패'); }
+}
+async function pullFromCloud(manual){
+  if(!state.settings.binId){ if(manual) showToast('Bin ID를 먼저 입력해주세요'); return; }
+  const key = document.getElementById('s_apiKey').value.trim() || state.settings.apiKey;
+  const binId = document.getElementById('s_binId').value.trim() || state.settings.binId;
+  try{
+    const res = await fetch('https://api.jsonbin.io/v3/b/'+binId+'/latest', { headers: key ? { 'X-Master-Key': key } : {} });
+    if(res.ok){
+      const json = await res.json(); const rec = json.record || {};
+      state.items = rec.items || []; state.wholesalers = rec.wholesalers || [];
+      state.buildings = rec.buildings && rec.buildings.length ? rec.buildings : ["디오트"];
+      state.quotes = rec.quotes || []; state.orders = rec.orders || []; state.wishes = rec.wishes || []; state.saips = rec.saips || [];
+      state.settings.binId = binId; state.settings.apiKey = key; state.settings.lastSync = Date.now();
+      saveLocal();
+      renderItemCatFilter(); renderBuildingFilter(); renderOrderStatusFilter();
+      renderItems(); renderWholesalers(); renderQuoteWholesalerOptions(); renderQuotes();
+      renderOrders(); renderWishes(); renderSaips(); updateSyncInfo();
+      if(manual) showToast('클라우드에서 가져왔어요');
+    } else { if(manual) showToast('가져오기 실패 (Bin ID/Key 확인)'); }
+  }catch(e){ if(manual) showToast('네트워크 오류'); }
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

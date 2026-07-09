@@ -1,0 +1,25 @@
+{
+  "name": "도매 인사이트",
+  "short_name": "도매인사이트",
+  "description": "도매 구매/주문/견적/위시/사입삼촌/구매처 관리 대시보드",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#faf8f5",
+  "theme_color": "#C79BD6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-옷장_192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-옷장_512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

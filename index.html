@@ -1387,17 +1387,17 @@ function buildSaipCopyText(s){
   let lines = [];
   lines.push(`${mmdd} ${s.type||'주문'}`);
   shopGroups.forEach((g, gi)=>{
+    const shopTotal = g.items.reduce((sum,it)=> sum+(it.price||0)*(it.qty||0), 0);
     const daenapTotal = g.items.filter(it=>it.status==='daenap').reduce((sum,it)=> sum+(it.price||0)*(it.qty||0), 0);
     const nameGroups = groupItemsByName(g.items);
     nameGroups.forEach((ng, ni)=>{
       const label = nameGroups.length > 1 ? `${gi+1}-${ni+1}.` : `${gi+1}.`;
-      lines.push(`${label} ${ng.name} \\${fmtNum(ng.price)}`);
+      lines.push(`${label} ${ng.name}  ${fmtNum(ng.price)}원`);
       ng.items.forEach(it=>{
         lines.push(`${[it.color,it.size].filter(Boolean).join('/')}${it.qty?'/'+it.qty:''}`);
       });
-      const nameTotal = ng.items.reduce((sum,it)=> sum+(ng.price||0)*(it.qty||0), 0);
-      lines.push(`총 금액 \\${fmtNum(nameTotal)}`);
     });
+    lines.push(`총 금액  ${fmtNum(shopTotal)}원`);
     const loc = [g.building, g.floor, g.unit].filter(Boolean).join(' ');
     lines.push(`${[loc, g.shopName].filter(Boolean).join(' ')}`);
     if(daenapTotal > 0) lines.push(`>> 대납 \\${fmtNum(daenapTotal)}`);

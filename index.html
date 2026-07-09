@@ -1340,9 +1340,20 @@ function saveSaip(){
     name:r.name.trim(), price:Number(r.price)||0, color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||1,
     shopName:r.shopName.trim(), building:r.building.trim(), floor:r.floor.trim(), unit:r.unit.trim(), status: r.status==='daenap'?'daenap':'wannap'
   }));
-  const data = { applyDate: document.getElementById('sp_date').value, type: ui.formSaipType, items };
-  if(ui.editingSaipId){ const idx = state.saips.findIndex(s=>s.id===ui.editingSaipId); state.saips[idx] = Object.assign(state.saips[idx], data); }
-  else { data.id = crypto.randomUUID(); state.saips.push(data); }
+  const applyDate = document.getElementById('sp_date').value;
+  const type = ui.formSaipType;
+  if(ui.editingSaipId){
+    const idx = state.saips.findIndex(s=>s.id===ui.editingSaipId);
+    state.saips[idx] = Object.assign(state.saips[idx], { applyDate, type, items });
+  } else {
+    const existing = state.saips.find(s=> s.applyDate === applyDate);
+    if(existing){
+      existing.items = (existing.items||[]).concat(items);
+      existing.type = type;
+    } else {
+      state.saips.push({ id: crypto.randomUUID(), applyDate, type, items });
+    }
+  }
   saveLocal(); renderSaips(); closeModal('saipModal'); showToast('저장했어요'); pushToCloud();
 }
 function deleteCurrentSaip(){
@@ -1361,25 +1372,32 @@ function groupSaipItemsByShop(items){
   });
   return groups;
 }
+function groupItemsByName(items){
+  const groups = []; const idxMap = {};
+  items.forEach(it=>{
+    const key = (it.name||'').trim() + '|' + (it.price||0);
+    if(!(key in idxMap)){ idxMap[key] = groups.length; groups.push({ name:it.name, price:it.price, items:[] }); }
+    groups[idxMap[key]].items.push(it);
+  });
+  return groups;
+}
 function buildSaipCopyText(s){
   const mmdd = s.applyDate ? s.applyDate.slice(5,7)+s.applyDate.slice(8,10) : '';
-  const groups = groupSaipItemsByShop(s.items);
+  const shopGroups = groupSaipItemsByShop(s.items);
   let lines = [];
   lines.push(`${mmdd} ${s.type||'주문'}`);
-  groups.forEach((g, gi)=>{
-    const shopTotal = g.items.reduce((sum,it)=> sum+(it.price||0)*(it.qty||0), 0);
+  shopGroups.forEach((g, gi)=>{
     const daenapTotal = g.items.filter(it=>it.status==='daenap').reduce((sum,it)=> sum+(it.price||0)*(it.qty||0), 0);
-    if(g.items.length === 1){
-      const it = g.items[0];
-      lines.push(`${gi+1}. ${it.name} \\${fmtNum(it.price)}`);
-      lines.push(`${[it.color,it.size].filter(Boolean).join('/')}${it.qty?'/'+it.qty:''}`);
-    } else {
-      g.items.forEach((it,ii)=>{
-        lines.push(`${gi+1}-${ii+1}. ${it.name} \\${fmtNum(it.price)}`);
+    const nameGroups = groupItemsByName(g.items);
+    nameGroups.forEach((ng, ni)=>{
+      const label = nameGroups.length > 1 ? `${gi+1}-${ni+1}.` : `${gi+1}.`;
+      lines.push(`${label} ${ng.name} \\${fmtNum(ng.price)}`);
+      ng.items.forEach(it=>{
         lines.push(`${[it.color,it.size].filter(Boolean).join('/')}${it.qty?'/'+it.qty:''}`);
       });
-    }
-    lines.push(`총 금액 \\${fmtNum(shopTotal)}`);
+      const nameTotal = ng.items.reduce((sum,it)=> sum+(ng.price||0)*(it.qty||0), 0);
+      lines.push(`총 금액 \\${fmtNum(nameTotal)}`);
+    });
     const loc = [g.building, g.floor, g.unit].filter(Boolean).join(' ');
     lines.push(`${[loc, g.shopName].filter(Boolean).join(' ')}`);
     if(daenapTotal > 0) lines.push(`>> 대납 \\${fmtNum(daenapTotal)}`);

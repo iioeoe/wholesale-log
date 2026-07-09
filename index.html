@@ -435,6 +435,7 @@ body{
       <button class="btn btn-secondary" onclick="editCurrentWish()">수정</button>
       <button class="btn btn-primary" onclick="convertWishToItem()">구매완료 전환</button>
     </div>
+    <button class="btn btn-outline" style="width:100%; margin-top:10px;" onclick="convertWishToOrder()">주문내역으로 전환</button>
   </div>
 </div>
 
@@ -443,6 +444,13 @@ body{
   <div class="modal-sheet">
     <div class="modal-head"><h2 id="saipModalTitle">사입 신청 등록</h2><button class="modal-close" onclick="closeModal('saipModal')">✕</button></div>
     <div class="field"><label>사입신청일</label><input type="date" id="sp_date"></div>
+    <div class="field"><label>유형</label>
+      <div class="select-chip-group" id="saipTypeGroup">
+        <div class="select-chip" data-type="픽업" onclick="setSaipType('픽업')">픽업</div>
+        <div class="select-chip" data-type="주문" onclick="setSaipType('주문')">주문</div>
+        <div class="select-chip" data-type="주문&픽업" onclick="setSaipType('주문&픽업')">주문&픽업</div>
+      </div>
+    </div>
     <div class="field">
       <label>상품 목록 (상품별로 대납/완납 선택)</label>
       <div id="saipRows"></div>
@@ -606,6 +614,7 @@ let ui = {
   formPayments: [],
   formOrderBack: false,
   formSaipRows: [],
+  formSaipType: '주문',
   wishFormMajor: null,
   wishFormMinor: null,
   formWishPhotos: [],
@@ -1006,12 +1015,15 @@ function renderOrders(){
     const totalQty = optionsTotalQty(o.options);
     html += `<div class="order-line" onclick="openOrderEdit('${o.id}')">
       <div class="ol-info">
-        <div class="ol-name">${escapeHtml(o.name)}</div>
+        <div class="ol-name">${escapeHtml(o.name)}${o.saipLinked ? ' <span style="font-size:10px; color:var(--gray); font-weight:600;">(사입삼촌 전환됨)</span>' : ''}</div>
         ${opt ? `<div class="ol-opt">${escapeHtml(opt)}</div>` : ''}
         <div class="ol-sub">${escapeHtml(o.wholesaler||'-')} · ${fmtMoney(o.price)} × ${totalQty} = ${fmtMoney((o.price||0)*totalQty)}</div>
         ${o.backorder && o.backorderDate ? `<div class="ol-sub">미송 예정일: ${o.backorderDate}</div>` : ''}
       </div>
-      <div class="status-chip ${o.backorder?'back':'done'}" onclick="toggleOrderStatus(event,'${o.id}')">${o.backorder?'미송':'재고있음'}</div>
+      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+        <div class="status-chip ${o.backorder?'back':'done'}" onclick="toggleOrderStatus(event,'${o.id}')">${o.backorder?'미송':'재고있음'}</div>
+        <button class="status-chip" style="background:#eef0fb; color:var(--navy-soft);" onclick="convertOrderToSaip(event,'${o.id}')">🧾 사입삼촌</button>
+      </div>
     </div>`;
   });
   wrap.innerHTML = html;
@@ -1028,16 +1040,16 @@ function setOrderStatus(back){
   document.getElementById('o_status_back').classList.toggle('sel', back);
   document.getElementById('o_backorderDateField').style.display = back ? 'block' : 'none';
 }
-function openOrderModal(){
+function openOrderModal(prefill){
   ui.editingOrderId = null; ui.formOrderBack = false;
   document.getElementById('orderModalTitle').textContent = '주문 등록';
   document.getElementById('orderDeleteBtn').style.display = 'none';
   document.getElementById('o_date').value = new Date().toISOString().slice(0,10);
-  document.getElementById('o_name').value = '';
-  document.getElementById('o_price').value = '';
+  document.getElementById('o_name').value = prefill?.name || '';
+  document.getElementById('o_price').value = prefill?.price || '';
   document.getElementById('o_backorderDate').value = '';
-  document.getElementById('o_wholesaler').innerHTML = wholesalerOptionsHtml('');
-  resetOptRows('order', null);
+  document.getElementById('o_wholesaler').innerHTML = wholesalerOptionsHtml(prefill?.wholesaler || '');
+  resetOptRows('order', prefill?.options);
   setOrderStatus(false);
   openModal('orderModal');
 }
@@ -1218,6 +1230,17 @@ function convertWishToItem(){
   openItemModal({ name: w.name, price: w.price, wholesaler: w.wholesaler, options: w.options, photos: w.photos });
   showToast('구매완료 탭에서 마저 입력해주세요');
 }
+function convertWishToOrder(){
+  const id = ui.viewingWishId || ui.editingWishId;
+  const w = state.wishes.find(x=>x.id===id);
+  if(!w){ showToast('전환할 위시를 찾을 수 없어요'); return; }
+  closeModal('wishDetailModal'); closeModal('wishModal');
+  state.wishes = state.wishes.filter(x=>x.id!==id);
+  saveLocal(); renderWishes(); pushToCloud();
+  switchTab(2);
+  openOrderModal({ name: w.name, price: w.price, wholesaler: w.wholesaler, options: w.options });
+  showToast('주문내역 탭에서 마저 입력해주세요');
+}
 
 /* ============ TAB5: 사입삼촌 ============ */
 function addSaipRow(row){
@@ -1274,7 +1297,7 @@ function calcSaipFee(rows){
   const shopSet = new Set(rows.map(r=> (r.shopName||'').trim()).filter(Boolean));
   const shopCount = shopSet.size;
   const fee = shopCount * SAIP_FEE_PER_SHOP + (rows.length ? SAIP_SHIPPING_FEE : 0);
-  return { daenapTotal, wannapTotal, shopCount, fee, grandTotal: daenapTotal + fee };
+  return { daenapTotal, wannapTotal, itemsGrand: daenapTotal+wannapTotal, shopCount, fee, grandTotal: daenapTotal + fee };
 }
 function updateSaipFeePreview(){
   const r = calcSaipFee(ui.formSaipRows);
@@ -1285,21 +1308,29 @@ function updateSaipFeePreview(){
     <div class="fee-row"><span>택배비</span><span>${fmtMoney(ui.formSaipRows.length?SAIP_SHIPPING_FEE:0)}</span></div>
     <div class="fee-row total"><span>총 결제금액 (대납분+수수료)</span><span>${fmtMoney(r.grandTotal)}</span></div>`;
 }
-function openSaipModal(){
-  ui.editingSaipId = null; ui.formSaipRows = [];
+function setSaipType(type){
+  ui.formSaipType = type;
+  document.querySelectorAll('#saipTypeGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.type === type));
+}
+function openSaipModal(prefillRows){
+  ui.editingSaipId = null; ui.formSaipRows = []; ui.formSaipType = '주문';
   document.getElementById('saipModalTitle').textContent = '사입 신청 등록';
   document.getElementById('saipDeleteBtn').style.display = 'none';
   document.getElementById('sp_date').value = new Date().toISOString().slice(0,10);
-  addSaipRow();
+  setSaipType('주문');
+  if(prefillRows && prefillRows.length){ ui.formSaipRows = prefillRows; renderSaipRows(); }
+  else addSaipRow();
   openModal('saipModal');
 }
 function openSaipEdit(id){
   const s = state.saips.find(x=>x.id===id); if(!s) return;
   ui.editingSaipId = id;
   ui.formSaipRows = (s.items||[]).map(it=>Object.assign({id:crypto.randomUUID(), status: it.status || 'wannap'}, it));
+  ui.formSaipType = s.type || '주문';
   document.getElementById('saipModalTitle').textContent = '사입 신청 수정';
   document.getElementById('saipDeleteBtn').style.display = 'block';
   document.getElementById('sp_date').value = s.applyDate || '';
+  setSaipType(ui.formSaipType);
   if(ui.formSaipRows.length===0) addSaipRow(); else renderSaipRows();
   openModal('saipModal');
 }
@@ -1309,7 +1340,7 @@ function saveSaip(){
     name:r.name.trim(), price:Number(r.price)||0, color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||1,
     shopName:r.shopName.trim(), building:r.building.trim(), floor:r.floor.trim(), unit:r.unit.trim(), status: r.status==='daenap'?'daenap':'wannap'
   }));
-  const data = { applyDate: document.getElementById('sp_date').value, items };
+  const data = { applyDate: document.getElementById('sp_date').value, type: ui.formSaipType, items };
   if(ui.editingSaipId){ const idx = state.saips.findIndex(s=>s.id===ui.editingSaipId); state.saips[idx] = Object.assign(state.saips[idx], data); }
   else { data.id = crypto.randomUUID(); state.saips.push(data); }
   saveLocal(); renderSaips(); closeModal('saipModal'); showToast('저장했어요'); pushToCloud();
@@ -1320,6 +1351,41 @@ function deleteCurrentSaip(){
   state.saips = state.saips.filter(s=>s.id!==ui.editingSaipId);
   saveLocal(); renderSaips(); closeModal('saipModal'); showToast('삭제했어요'); pushToCloud();
 }
+function fmtNum(n){ return (Number(n)||0).toLocaleString('ko-KR'); }
+function groupSaipItemsByShop(items){
+  const groups = []; const idxMap = {};
+  (items||[]).forEach(it=>{
+    const key = (it.shopName||'').trim() || '(상호명 미입력)';
+    if(!(key in idxMap)){ idxMap[key] = groups.length; groups.push({ shopName:key, building:it.building, floor:it.floor, unit:it.unit, items:[] }); }
+    groups[idxMap[key]].items.push(it);
+  });
+  return groups;
+}
+function buildSaipCopyText(s){
+  const mmdd = s.applyDate ? s.applyDate.slice(5,7)+s.applyDate.slice(8,10) : '';
+  const groups = groupSaipItemsByShop(s.items);
+  let lines = [];
+  lines.push(`${mmdd} ${s.type||'주문'}`);
+  groups.forEach((g, gi)=>{
+    const shopTotal = g.items.reduce((sum,it)=> sum+(it.price||0)*(it.qty||0), 0);
+    const daenapTotal = g.items.filter(it=>it.status==='daenap').reduce((sum,it)=> sum+(it.price||0)*(it.qty||0), 0);
+    if(g.items.length === 1){
+      const it = g.items[0];
+      lines.push(`${gi+1}. ${it.name} \\${fmtNum(it.price)}`);
+      lines.push(`${[it.color,it.size].filter(Boolean).join('/')}${it.qty?'/'+it.qty:''}`);
+    } else {
+      g.items.forEach((it,ii)=>{
+        lines.push(`${gi+1}-${ii+1}. ${it.name} \\${fmtNum(it.price)}`);
+        lines.push(`${[it.color,it.size].filter(Boolean).join('/')}${it.qty?'/'+it.qty:''}`);
+      });
+    }
+    lines.push(`총 금액 \\${fmtNum(shopTotal)}`);
+    const loc = [g.building, g.floor, g.unit].filter(Boolean).join(' ');
+    lines.push(`${[loc, g.shopName].filter(Boolean).join(' ')}`);
+    if(daenapTotal > 0) lines.push(`>> 대납 \\${fmtNum(daenapTotal)}`);
+  });
+  return lines.join('\n');
+}
 function renderSaips(){
   const q = document.getElementById('saipSearch').value.trim().toLowerCase();
   let list = state.saips.slice().sort((a,b)=> (b.applyDate||'').localeCompare(a.applyDate||''));
@@ -1328,37 +1394,32 @@ function renderSaips(){
   if(list.length===0){ wrap.innerHTML = `<div class="empty-state"><div class="emoji">🧾</div><p>등록된 사입 신청이 없어요</p><p>+ 버튼으로 신청건을 추가해보세요</p></div>`; return; }
   wrap.innerHTML = list.map(s=>{
     const r = calcSaipFee(s.items||[]);
-    const daenapCount = (s.items||[]).filter(it=>it.status==='daenap').length;
-    const wannapCount = (s.items||[]).length - daenapCount;
-    let badges = '';
-    if(daenapCount) badges += `<span class="b-daenap">대납 ${daenapCount}</span>`;
-    if(wannapCount) badges += `<span class="b-wannap">완납 ${wannapCount}</span>`;
+    const mmdd = s.applyDate ? s.applyDate.slice(5,7)+s.applyDate.slice(8,10) : '날짜미지정';
+    const shopCount = new Set((s.items||[]).map(it=>(it.shopName||'').trim()).filter(Boolean)).size;
     return `<div class="saip-card" onclick="openSaipDetail('${s.id}')">
-      <div class="saip-top"><span class="saip-date">${s.applyDate||'날짜 미지정'}</span><span class="saip-badges">${badges}</span></div>
-      <div class="saip-meta">상품 ${((s.items||[]).length)}건 · 거래처 ${r.shopCount}곳</div>
-      <div class="saip-total">${fmtMoney(r.grandTotal)}</div>
+      <div class="saip-top"><span class="saip-date">${mmdd} · ${s.type||'주문'}</span></div>
+      <div class="saip-meta">상품 ${((s.items||[]).length)}건 · 거래처 ${shopCount}곳</div>
+      <div class="saip-total">${fmtMoney(r.itemsGrand)}${r.daenapTotal>0? ` <span style="font-size:11px; color:var(--navy-soft); font-weight:700;">(대납 ${fmtMoney(r.daenapTotal)})</span>`:''}</div>
     </div>`;
   }).join('');
+}
+function copySaipText(id){
+  const s = state.saips.find(x=>x.id===id); if(!s) return;
+  const text = buildSaipCopyText(s);
+  navigator.clipboard.writeText(text).then(()=>showToast('복사했어요')).catch(()=>showToast('복사에 실패했어요'));
 }
 function openSaipDetail(id){
   const s = state.saips.find(x=>x.id===id); if(!s) return;
   ui.viewingSaipId = id;
   const r = calcSaipFee(s.items||[]);
-  const itemsHtml = (s.items||[]).map(it=>{
-    const opt = [it.color, it.size].filter(Boolean).join(' / ');
-    const loc = [it.building, it.floor, it.unit].filter(Boolean).join(' ');
-    const badge = it.status==='daenap' ? `<span class="b-daenap">대납</span>` : `<span class="b-wannap">완납</span>`;
-    return `<div class="sit-row">
-      <div class="sit-name">${escapeHtml(it.name)} · ${fmtMoney(it.price)} × ${it.qty||1} ${badge}</div>
-      <div class="sit-sub">${opt ? escapeHtml(opt)+' · ' : ''}${escapeHtml(it.shopName||'-')} ${loc ? '('+escapeHtml(loc)+')' : ''}</div>
-    </div>`;
-  }).join('');
+  const copyText = buildSaipCopyText(s);
   document.getElementById('saipDetailBody').innerHTML = `
-    <div style="margin-bottom:12px;">
-      <span style="font-size:16px; font-weight:800; color:var(--navy);">${s.applyDate||'날짜 미지정'}</span>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <span style="font-size:12px; color:var(--gray); font-weight:700;">복사용 포맷</span>
+      <button class="copy-btn" onclick="copySaipText('${s.id}')">복사</button>
     </div>
-    <div class="saip-item-table">${itemsHtml}</div>
-    <div class="fee-box" style="margin-top:12px;">
+    <pre style="white-space:pre-wrap; background:#fff; border-radius:12px; padding:14px; font-size:13px; line-height:1.6; color:var(--navy); font-family:inherit; margin:0 0 14px;">${escapeHtml(copyText)}</pre>
+    <div class="fee-box">
       <div class="fee-row"><span>대납 상품 합계</span><span>${fmtMoney(r.daenapTotal)}</span></div>
       <div class="fee-row"><span>완납 상품 합계 (별도 정산됨)</span><span>${fmtMoney(r.wannapTotal)}</span></div>
       <div class="fee-row"><span>거래처 수수료 (${r.shopCount}곳 × 2,000원)</span><span>${fmtMoney(r.shopCount*SAIP_FEE_PER_SHOP)}</span></div>
@@ -1368,6 +1429,22 @@ function openSaipDetail(id){
   openModal('saipDetailModal');
 }
 function editCurrentSaip(){ closeModal('saipDetailModal'); openSaipEdit(ui.viewingSaipId); }
+
+function convertOrderToSaip(e, orderId){
+  e.stopPropagation();
+  const o = state.orders.find(x=>x.id===orderId); if(!o) return;
+  const wl = state.wholesalers.find(w=>w.name === o.wholesaler);
+  const baseOptions = (o.options && o.options.length) ? o.options : [{color:'',size:'',qty:1}];
+  const rows = baseOptions.map(opt=>({
+    id: crypto.randomUUID(), name:o.name, price:o.price, color:opt.color||'', size:opt.size||'', qty:opt.qty||1,
+    shopName:o.wholesaler||'', building: wl?.building||'', floor: wl?.floor||'', unit: wl?.unit||'', status:'wannap'
+  }));
+  o.saipLinked = true;
+  saveLocal(); renderOrders(); pushToCloud();
+  switchTab(5);
+  openSaipModal(rows);
+  showToast('주문 정보를 채워넣었어요. 확인 후 저장해주세요');
+}
 
 /* ============ TAB6: 건물 필터 / 구매처 리스트 ============ */
 function renderBuildingFilter(){

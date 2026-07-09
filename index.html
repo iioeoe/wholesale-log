@@ -4,8 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>도매 인사이트</title>
-<link rel="apple-touch-icon" href="icon-옷장.png">
-<link rel="icon" href="icon-옷장.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-옷장_192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-옷장_512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-옷장_192.png">
 <style>
 :root{
   --navy:#14236D;
@@ -202,6 +203,13 @@ body{
 .photo-slot{ width:76px; height:76px; border-radius:14px; position:relative; overflow:hidden; background:#f2e9f3; border:1.5px dashed #d9c6dd; display:flex; align-items:center; justify-content:center; color:#b79dbb; font-size:22px; cursor:pointer; flex-shrink:0; }
 .photo-slot img{ width:100%; height:100%; object-fit:cover; }
 .photo-slot .rm{ position:absolute; top:2px; right:2px; width:19px; height:19px; border-radius:50%; background:rgba(0,0,0,0.55); color:#fff; font-size:11px; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer; }
+.photo-slot .ed{ position:absolute; bottom:2px; right:2px; width:19px; height:19px; border-radius:50%; background:rgba(0,0,0,0.55); color:#fff; font-size:10px; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer; }
+
+.crop-viewport{ width:280px; height:280px; margin:6px auto 14px; overflow:hidden; position:relative; border-radius:16px; background:#111; touch-action:none; }
+.crop-viewport img{ position:absolute; top:0; left:0; user-select:none; -webkit-user-drag:none; pointer-events:none; }
+.crop-zoom-row{ display:flex; align-items:center; gap:10px; padding: 0 4px; }
+.crop-zoom-row input[type=range]{ flex:1; }
+.crop-hint{ text-align:center; font-size:11.5px; color:var(--gray); margin-bottom:4px; }
 
 .modal-actions{ display:flex; gap:10px; margin-top:18px; }
 .btn{ flex:1; padding:13px; border-radius:14px; border:none; font-size:14.5px; font-weight:700; cursor:pointer; font-family:inherit; }
@@ -221,6 +229,12 @@ body{
 .account-box .num{ font-size:14px; font-weight:700; color:var(--navy); }
 .copy-btn{ border:none; background:var(--accent); color:#fff; font-size:11px; font-weight:700; padding:6px 10px; border-radius:8px; cursor:pointer;}
 
+.opt-row{ display:flex; gap:6px; margin-bottom:8px; align-items:center; }
+.opt-row input{ flex:1; min-width:0; padding:10px 9px; border-radius:10px; border:1.5px solid #ecdff0; font-size:13px; font-family:inherit; background:#fff; color:var(--navy); outline:none; }
+.opt-row input:focus{ border-color:var(--accent); }
+.opt-row input.opt-qty{ flex:0 0 56px; text-align:center; }
+.opt-del{ flex-shrink:0; border:none; background:#fbe4e8; color:var(--danger); width:30px; height:30px; border-radius:9px; font-size:12px; cursor:pointer; }
+.opt-total-box{ background:#f6eef6; border-radius:12px; padding:10px 14px; margin-top:4px; }
 .fee-box{ background:#f6eef6; border-radius:14px; padding:14px; margin-top:6px; }
 .fee-row{ display:flex; justify-content:space-between; font-size:13px; padding:5px 0; color:var(--navy-soft); }
 .fee-row.total{ border-top:1.5px dashed #ddc9de; margin-top:6px; padding-top:10px; font-size:15px; font-weight:800; color:var(--navy); }
@@ -268,11 +282,14 @@ body{
   <div class="tab-panel" id="panel-3">
     <div class="quote-form">
       <div class="field" style="margin-bottom:8px;"><label>상품명</label><input type="text" id="qName" placeholder="예: 니트 원피스"></div>
-      <div class="row2">
-        <div class="field" style="flex:1; margin-bottom:0;"><label>예상 단가</label><input type="number" id="qPrice" placeholder="0"></div>
-        <div class="field" style="width:80px; margin-bottom:0;"><label>수량</label><input type="number" id="qQty" placeholder="1" value="1"></div>
+      <div class="field" style="margin-bottom:8px;"><label>단가</label><input type="number" id="qPrice" placeholder="0" oninput="refreshOptTotals('quote')"></div>
+      <div class="field" style="margin-bottom:8px;">
+        <label>색상 / 사이즈 / 수량</label>
+        <div id="quoteOptRows"></div>
+        <button class="btn btn-outline" style="width:100%;" onclick="addOptRow('quote')">+ 옵션 추가</button>
       </div>
       <div class="field" style="margin-top:8px; margin-bottom:0;"><label>구매처 (선택)</label><select id="qWholesaler"><option value="">미지정</option></select></div>
+      <div class="opt-total-box" id="quoteOptTotal"></div>
       <button class="btn btn-primary" style="width:100%; margin-top:12px;" onclick="addQuoteItem()">+ 후보에 담기</button>
     </div>
     <div id="quoteList"></div>
@@ -282,6 +299,7 @@ body{
   <!-- TAB 4: 위시리스트 -->
   <div class="tab-panel" id="panel-4">
     <div class="search-box"><span class="ic">🔍</span><input type="text" id="wishSearch" placeholder="상품명 · 구매처 검색" oninput="renderWishes()"></div>
+    <div class="chip-row" id="wishCatFilter"></div>
     <div id="wishList"></div>
   </div>
 
@@ -316,20 +334,20 @@ body{
     <div class="modal-head"><h2 id="itemModalTitle">상품 등록</h2><button class="modal-close" onclick="closeModal('itemModal')">✕</button></div>
     <div class="field"><label>대분류</label><div class="select-chip-group" id="majorCatGroup"></div></div>
     <div class="field"><label>소분류</label><div class="select-chip-group" id="minorCatGroup"></div></div>
+    <div class="field"><label>구매일</label><input type="date" id="f_date"></div>
     <div class="field"><label>상품명</label><input type="text" id="f_name" placeholder="예: 플리츠 스커트"></div>
-    <div class="field-row">
-      <div class="field"><label>금액 (원)</label><input type="number" id="f_price" placeholder="0"></div>
-      <div class="field"><label>구매일</label><input type="date" id="f_date"></div>
-    </div>
-    <div class="field-row">
-      <div class="field"><label>색상</label><input type="text" id="f_color" placeholder="예: 블랙"></div>
-      <div class="field"><label>사이즈</label><input type="text" id="f_size" placeholder="예: FREE"></div>
+    <div class="field"><label>단가</label><input type="number" id="f_price" placeholder="0" oninput="refreshOptTotals('item')"></div>
+    <div class="field">
+      <label>색상 / 사이즈 / 수량</label>
+      <div id="itemOptRows"></div>
+      <button class="btn btn-outline" style="width:100%;" onclick="addOptRow('item')">+ 옵션 추가</button>
     </div>
     <div class="field"><label>혼용률</label><input type="text" id="f_mix" placeholder="예: 폴리 80% 스판 20%"></div>
     <div class="field"><label>구매처</label><select id="f_wholesaler"><option value="">선택 안함</option></select></div>
     <div class="field"><label>사진 (최대 3장)</label><div class="photo-row" id="photoRow"></div>
       <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)"></div>
     <div class="field"><label>메모</label><textarea id="f_memo" placeholder="선택 입력"></textarea></div>
+    <div class="opt-total-box" id="itemOptTotal"></div>
     <div class="modal-actions">
       <button class="btn btn-danger" id="itemDeleteBtn" style="display:none;" onclick="deleteCurrentItem()">삭제</button>
       <button class="btn btn-primary" onclick="saveItem()">저장</button>
@@ -355,22 +373,22 @@ body{
     <div class="modal-head"><h2 id="orderModalTitle">주문 등록</h2><button class="modal-close" onclick="closeModal('orderModal')">✕</button></div>
     <div class="field"><label>주문일</label><input type="date" id="o_date"></div>
     <div class="field"><label>상품명</label><input type="text" id="o_name" placeholder="예: 니트 가디건"></div>
-    <div class="field-row">
-      <div class="field"><label>칼라</label><input type="text" id="o_color" placeholder="예: 베이지"></div>
-      <div class="field"><label>사이즈</label><input type="text" id="o_size" placeholder="예: M"></div>
+    <div class="field"><label>단가</label><input type="number" id="o_price" placeholder="0" oninput="refreshOptTotals('order')"></div>
+    <div class="field">
+      <label>색상 / 사이즈 / 수량</label>
+      <div id="orderOptRows"></div>
+      <button class="btn btn-outline" style="width:100%;" onclick="addOptRow('order')">+ 옵션 추가</button>
     </div>
-    <div class="field-row">
-      <div class="field"><label>수량</label><input type="number" id="o_qty" value="1"></div>
-      <div class="field"><label>단가 (원)</label><input type="number" id="o_price" placeholder="0"></div>
-    </div>
+    <div class="opt-total-box" id="orderOptTotal"></div>
     <div class="field"><label>구매처</label><select id="o_wholesaler"><option value="">선택 안함</option></select></div>
     <div class="field">
       <label>입고 상태</label>
       <div class="select-chip-group">
-        <div class="select-chip" id="o_status_done" onclick="setOrderStatus(false)">입고완료</div>
+        <div class="select-chip" id="o_status_done" onclick="setOrderStatus(false)">재고있음</div>
         <div class="select-chip" id="o_status_back" onclick="setOrderStatus(true)">미송</div>
       </div>
     </div>
+    <div class="field" id="o_backorderDateField" style="display:none;"><label>미송 예정일</label><input type="date" id="o_backorderDate"></div>
     <div class="modal-actions">
       <button class="btn btn-danger" id="orderDeleteBtn" style="display:none;" onclick="deleteCurrentOrder()">삭제</button>
       <button class="btn btn-primary" onclick="saveOrder()">저장</button>
@@ -382,9 +400,19 @@ body{
 <div class="modal-overlay" id="wishModal">
   <div class="modal-sheet">
     <div class="modal-head"><h2 id="wishModalTitle">위시 등록</h2><button class="modal-close" onclick="closeModal('wishModal')">✕</button></div>
+    <div class="field"><label>대분류</label><div class="select-chip-group" id="wishMajorCatGroup"></div></div>
+    <div class="field"><label>소분류</label><div class="select-chip-group" id="wishMinorCatGroup"></div></div>
     <div class="field"><label>상품명</label><input type="text" id="wi_name" placeholder="예: 트위드 자켓"></div>
-    <div class="field"><label>예상 가격 (원)</label><input type="number" id="wi_price" placeholder="0"></div>
+    <div class="field"><label>단가</label><input type="number" id="wi_price" placeholder="0" oninput="refreshOptTotals('wish')"></div>
+    <div class="field">
+      <label>색상 / 사이즈 / 수량</label>
+      <div id="wishOptRows"></div>
+      <button class="btn btn-outline" style="width:100%;" onclick="addOptRow('wish')">+ 옵션 추가</button>
+    </div>
+    <div class="opt-total-box" id="wishOptTotal"></div>
     <div class="field"><label>구매처 (선택)</label><select id="wi_wholesaler"><option value="">미지정</option></select></div>
+    <div class="field"><label>사진 (최대 3장)</label><div class="photo-row" id="wishPhotoRow"></div>
+      <input type="file" id="wishPhotoInput" accept="image/*" style="display:none" onchange="handleWishPhotoUpload(event)"></div>
     <div class="field"><label>메모</label><textarea id="wi_memo" placeholder="선택 입력"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-danger" id="wishDeleteBtn" style="display:none;" onclick="deleteCurrentWish()">삭제</button>
@@ -411,14 +439,7 @@ body{
     <div class="modal-head"><h2 id="saipModalTitle">사입 신청 등록</h2><button class="modal-close" onclick="closeModal('saipModal')">✕</button></div>
     <div class="field"><label>사입신청일</label><input type="date" id="sp_date"></div>
     <div class="field">
-      <label>대납 / 완납</label>
-      <div class="status-toggle-row">
-        <div class="status-toggle on-daenap" id="sp_daenap" onclick="toggleSaipStatus('daenap')">대납</div>
-        <div class="status-toggle on-wannap" id="sp_wannap" onclick="toggleSaipStatus('wannap')">완납</div>
-      </div>
-    </div>
-    <div class="field">
-      <label>상품 목록</label>
+      <label>상품 목록 (상품별로 대납/완납 선택)</label>
       <div id="saipRows"></div>
       <button class="btn btn-outline" style="width:100%;" onclick="addSaipRow()">+ 상품 추가</button>
     </div>
@@ -450,7 +471,7 @@ body{
     <div class="field"><label>건물</label><select id="w_building"></select></div>
     <div class="field-row">
       <div class="field"><label>층</label><input type="text" id="w_floor" placeholder="예: 지하1층"></div>
-      <div class="field"><label>호</label><input type="text" id="w_unit" placeholder="예: D14"></div>
+      <div class="field"><label>호</label><input type="text" id="w_unit" placeholder="예: D14" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
     <div class="field"><label>결제방법</label>
       <div class="select-chip-group" id="paymentGroup">
@@ -489,6 +510,23 @@ body{
   </div>
 </div>
 
+<!-- ============ MODAL: 사진 자르기 ============ -->
+<div class="modal-overlay" id="cropModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2>사진 자르기</h2><button class="modal-close" onclick="cancelCrop()">✕</button></div>
+    <div class="crop-hint">드래그해서 위치를 옮기고, 슬라이더로 확대/축소하세요</div>
+    <div class="crop-viewport" id="cropViewport"><img id="cropImg" src=""></div>
+    <div class="crop-zoom-row">
+      <span style="font-size:16px;">🔍</span>
+      <input type="range" id="cropZoom" min="100" max="300" value="100" oninput="onCropZoom(this.value)">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="cancelCrop()">취소</button>
+      <button class="btn btn-primary" onclick="confirmCrop()">적용</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL: 설정 (동기화) ============ -->
 <div class="modal-overlay" id="settingsModal">
   <div class="modal-sheet">
@@ -519,7 +557,7 @@ const BUILDING_COLORS = ["#F5A8D6","#8FB8D6","#E7A97C","#BAA6C1","#7FC7A0","#E35
 const SAIP_FEE_PER_SHOP = 2000;
 const SAIP_SHIPPING_FEE = 4000;
 const TAB_ACCENT = {
-  1: '#D9A0EF', // 구매완료: 라벤더
+  1: '#C79BD6', // 구매완료
   2: '#F6A8CC', // 주문내역: 핑크
   3: '#9FD8ED', // 견적계산: 하늘색
   4: '#fde6b1', // 위시리스트: 연노랑
@@ -527,12 +565,12 @@ const TAB_ACCENT = {
   6: '#FDCFA0'  // 구매처: 피치
 };
 const TAB_LIGHT = {
-  1: '#F3E6FB', // 구매완료: 연한 라벤더
-  2: '#FDEAF2', // 주문내역: 연한 핑크
-  3: '#EAF7FC', // 견적계산: 연한 하늘색
-  4: '#FFF8E8', // 위시리스트: 연한 연노랑
-  5: '#EDF7E8', // 사입삼촌: 연한 민트
-  6: '#FFF3E7'  // 구매처: 연한 피치
+  1: '#F2E9F5', // 구매완료 모달
+  2: '#F4E3EB', // 주문내역 모달
+  3: '#EAF7FC', // 견적계산 모달
+  4: '#FFF8E8', // 위시리스트 모달
+  5: '#EDF7E8', // 사입삼촌 모달
+  6: '#FFF3E7'  // 구매처 모달
 };
 
 let state = {
@@ -551,6 +589,7 @@ let ui = {
   itemCatFilter: "전체",
   buildingFilter: "전체",
   orderStatusFilter: "전체",
+  wishCatFilter: "전체",
   editingItemId: null,
   editingWlId: null,
   editingOrderId: null,
@@ -561,14 +600,19 @@ let ui = {
   formPhotos: [],
   formPayments: [],
   formOrderBack: false,
-  formSaipDaenap: false,
-  formSaipWannap: false,
   formSaipRows: [],
+  wishFormMajor: null,
+  wishFormMinor: null,
+  formWishPhotos: [],
+  optRows: { item: [], order: [], quote: [], wish: [] },
   viewingItemId: null,
   viewingWlId: null,
   viewingWishId: null,
   viewingSaipId: null
 };
+const OPT_PRICE_FIELD = { item:'f_price', order:'o_price', quote:'qPrice', wish:'wi_price' };
+const OPT_ROWS_CONTAINER = { item:'itemOptRows', order:'orderOptRows', quote:'quoteOptRows', wish:'wishOptRows' };
+const OPT_TOTAL_EL = { item:'itemOptTotal', order:'orderOptTotal', quote:'quoteOptTotal', wish:'wishOptTotal' };
 
 /* ============ 저장/로드 (localStorage) ============ */
 function loadLocal(){
@@ -597,13 +641,16 @@ function init(){
   renderItemCatFilter();
   renderBuildingFilter();
   renderOrderStatusFilter();
+  renderWishCatFilter();
   renderItems();
   renderWholesalers();
   renderQuoteWholesalerOptions();
+  resetOptRows('quote', null);
   renderQuotes();
   renderOrders();
   renderWishes();
   renderSaips();
+  initCropperEvents();
   if(state.settings.binId && state.settings.apiKey){ pullFromCloud(false); }
 }
 
@@ -650,18 +697,22 @@ function renderItems(){
   const q = document.getElementById('itemSearch').value.trim().toLowerCase();
   let list = state.items.slice().sort((a,b)=> (b.purchaseDate||'').localeCompare(a.purchaseDate||''));
   if(ui.itemCatFilter !== '전체') list = list.filter(it=> it.category === ui.itemCatFilter);
-  if(q) list = list.filter(it=> (it.name||'').toLowerCase().includes(q) || (it.color||'').toLowerCase().includes(q) || (it.wholesaler||'').toLowerCase().includes(q));
+  if(q) list = list.filter(it=> (it.name||'').toLowerCase().includes(q) || (it.options||[]).some(o=>(o.color||'').toLowerCase().includes(q)) || (it.wholesaler||'').toLowerCase().includes(q));
   const wrap = document.getElementById('itemList');
   if(list.length === 0){ wrap.innerHTML = `<div class="empty-state"><div class="emoji">🛍️</div><p>등록된 상품이 없어요</p><p>+ 버튼으로 구매 상품을 추가해보세요</p></div>`; return; }
   wrap.innerHTML = list.map(it=>{
     const color = CAT_COLOR[it.category] || '#BAA6C1';
     const thumb = it.photos && it.photos[0] ? `<img class="item-thumb" src="${it.photos[0]}">` : `<div class="item-thumb empty" style="background:linear-gradient(135deg, ${color}, #fff2)">👗</div>`;
+    const totalQty = optionsTotalQty(it.options);
+    const totalPrice = (it.price||0) * totalQty;
+    const optSummary = optionsSummary(it.options);
     return `<div class="item-card" onclick="openItemDetail('${it.id}')">${thumb}
       <div class="item-info">
         <div class="item-top"><span class="cat-badge" style="background:${color}">${it.category}${it.subcategory? ' · '+it.subcategory:''}</span></div>
         <div class="item-name">${escapeHtml(it.name||'(이름없음)')}</div>
         <div class="item-meta">${escapeHtml(it.wholesaler||'-')} · ${it.purchaseDate||'-'}</div>
-        <div class="item-price">${fmtMoney(it.price)}</div>
+        ${optSummary ? `<div class="item-meta">${escapeHtml(optSummary)}</div>` : ''}
+        <div class="item-price">${fmtMoney(totalPrice)}${totalQty?` (총 ${totalQty}개)`:''}</div>
       </div></div>`;
   }).join('');
 }
@@ -689,18 +740,18 @@ function wholesalerOptionsHtml(selected){
   return '<option value="">선택 안함</option>' + state.wholesalers.map(w=>`<option value="${escapeHtml(w.name)}" ${w.name===selected?'selected':''}>${escapeHtml(w.name)}</option>`).join('');
 }
 function openItemModal(prefill){
-  ui.editingItemId = null; ui.formMajor = null; ui.formMinor = null; ui.formPhotos = [];
+  ui.editingItemId = null; ui.formMajor = null; ui.formMinor = null;
+  ui.formPhotos = prefill?.photos ? prefill.photos.slice(0,3) : (prefill?.photo ? [prefill.photo] : []);
   document.getElementById('itemModalTitle').textContent = '상품 등록';
   document.getElementById('itemDeleteBtn').style.display = 'none';
   document.getElementById('f_name').value = prefill?.name || '';
   document.getElementById('f_price').value = prefill?.price || '';
-  document.getElementById('f_color').value = '';
-  document.getElementById('f_size').value = '';
   document.getElementById('f_mix').value = '';
   document.getElementById('f_memo').value = '';
   document.getElementById('f_date').value = new Date().toISOString().slice(0,10);
   buildMajorCatChips(); renderMinorChips();
   document.getElementById('f_wholesaler').innerHTML = wholesalerOptionsHtml(prefill?.wholesaler || '');
+  resetOptRows('item', prefill?.options);
   renderPhotoRow();
   openModal('itemModal');
 }
@@ -711,8 +762,6 @@ function openItemEdit(id){
   document.getElementById('itemDeleteBtn').style.display = 'block';
   document.getElementById('f_name').value = it.name || '';
   document.getElementById('f_price').value = it.price || '';
-  document.getElementById('f_color').value = it.color || '';
-  document.getElementById('f_size').value = it.size || '';
   document.getElementById('f_mix').value = it.mixRatio || '';
   document.getElementById('f_memo').value = it.memo || '';
   document.getElementById('f_date').value = it.purchaseDate || '';
@@ -721,45 +770,178 @@ function openItemEdit(id){
   renderMinorChips();
   document.querySelectorAll('#minorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.minor === it.subcategory));
   document.getElementById('f_wholesaler').innerHTML = wholesalerOptionsHtml(it.wholesaler || '');
+  resetOptRows('item', it.options);
   renderPhotoRow();
   openModal('itemModal');
 }
 function renderPhotoRow(){
   const wrap = document.getElementById('photoRow');
-  let html = ui.formPhotos.map((p,idx)=>`<div class="photo-slot"><img src="${p}"><button class="rm" onclick="removePhoto(${idx}, event)">✕</button></div>`).join('');
+  let html = ui.formPhotos.map((p,idx)=>`<div class="photo-slot"><img src="${p}"><button class="ed" onclick="editPhoto(${idx}, event)">✏</button><button class="rm" onclick="removePhoto(${idx}, event)">✕</button></div>`).join('');
   if(ui.formPhotos.length < 3) html += `<div class="photo-slot" onclick="document.getElementById('photoInput').click()">＋</div>`;
   wrap.innerHTML = html;
 }
 function removePhoto(idx, e){ e.stopPropagation(); ui.formPhotos.splice(idx,1); renderPhotoRow(); }
+function editPhoto(idx, e){
+  e.stopPropagation();
+  openCropper(ui.formPhotos[idx], (cropped)=>{ ui.formPhotos[idx] = cropped; renderPhotoRow(); });
+}
 function handlePhotoUpload(e){
   const file = e.target.files[0]; if(!file) return;
-  compressImage(file, (dataUrl)=>{ if(ui.formPhotos.length < 3) ui.formPhotos.push(dataUrl); renderPhotoRow(); });
+  readFileAsDataURL(file, (rawUrl)=>{
+    openCropper(rawUrl, (cropped)=>{ if(ui.formPhotos.length < 3) ui.formPhotos.push(cropped); renderPhotoRow(); });
+  });
   e.target.value = '';
 }
-function compressImage(file, cb){
+function readFileAsDataURL(file, cb){
   const reader = new FileReader();
-  reader.onload = function(ev){
-    const img = new Image();
-    img.onload = function(){
-      const maxW = 700; const scale = Math.min(1, maxW / img.width);
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width * scale; canvas.height = img.height * scale;
-      const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      cb(canvas.toDataURL('image/jpeg', 0.7));
-    };
-    img.src = ev.target.result;
-  };
+  reader.onload = (ev)=> cb(ev.target.result);
   reader.readAsDataURL(file);
 }
+
+/* ============ 범용 사진 자르기(크롭) 엔진 ============ */
+let cropState = { imgEl:null, natW:0, natH:0, baseScale:1, scale:1, offsetX:0, offsetY:0, VP:280, dragging:false, startX:0, startY:0, startOffX:0, startOffY:0, onDone:null };
+function openCropper(rawUrl, onDone){
+  const imgEl = document.getElementById('cropImg');
+  imgEl.src = rawUrl;
+  cropState.onDone = onDone;
+  imgEl.onload = function(){
+    cropState.natW = imgEl.naturalWidth; cropState.natH = imgEl.naturalHeight;
+    cropState.baseScale = Math.max(cropState.VP / cropState.natW, cropState.VP / cropState.natH);
+    cropState.scale = 1;
+    document.getElementById('cropZoom').value = 100;
+    applyCropTransform(true);
+  };
+  openModal('cropModal');
+}
+function applyCropTransform(center){
+  const imgEl = document.getElementById('cropImg');
+  const dispW = cropState.natW * cropState.baseScale * cropState.scale;
+  const dispH = cropState.natH * cropState.baseScale * cropState.scale;
+  if(center){
+    cropState.offsetX = (cropState.VP - dispW) / 2;
+    cropState.offsetY = (cropState.VP - dispH) / 2;
+  } else {
+    cropState.offsetX = Math.min(0, Math.max(cropState.VP - dispW, cropState.offsetX));
+    cropState.offsetY = Math.min(0, Math.max(cropState.VP - dispH, cropState.offsetY));
+  }
+  imgEl.style.width = dispW + 'px';
+  imgEl.style.height = dispH + 'px';
+  imgEl.style.transform = `translate(${cropState.offsetX}px, ${cropState.offsetY}px)`;
+}
+function onCropZoom(val){
+  cropState.scale = Number(val) / 100;
+  applyCropTransform(false);
+}
+function cropPointerDown(e){
+  cropState.dragging = true;
+  const p = e.touches ? e.touches[0] : e;
+  cropState.startX = p.clientX; cropState.startY = p.clientY;
+  cropState.startOffX = cropState.offsetX; cropState.startOffY = cropState.offsetY;
+}
+function cropPointerMove(e){
+  if(!cropState.dragging) return;
+  e.preventDefault();
+  const p = e.touches ? e.touches[0] : e;
+  const dx = p.clientX - cropState.startX; const dy = p.clientY - cropState.startY;
+  cropState.offsetX = cropState.startOffX + dx; cropState.offsetY = cropState.startOffY + dy;
+  applyCropTransform(false);
+}
+function cropPointerUp(){ cropState.dragging = false; }
+function cancelCrop(){ closeModal('cropModal'); cropState.onDone = null; }
+function confirmCrop(){
+  const displayScale = cropState.baseScale * cropState.scale;
+  const srcX = -cropState.offsetX / displayScale;
+  const srcY = -cropState.offsetY / displayScale;
+  const srcSize = cropState.VP / displayScale;
+  const outSize = 700;
+  const canvas = document.createElement('canvas');
+  canvas.width = outSize; canvas.height = outSize;
+  const ctx = canvas.getContext('2d');
+  const imgEl = document.getElementById('cropImg');
+  ctx.drawImage(imgEl, srcX, srcY, srcSize, srcSize, 0, 0, outSize, outSize);
+  const result = canvas.toDataURL('image/jpeg', 0.75);
+  const cb = cropState.onDone;
+  closeModal('cropModal');
+  cropState.onDone = null;
+  if(cb) cb(result);
+}
+function initCropperEvents(){
+  const vp = document.getElementById('cropViewport');
+  vp.addEventListener('mousedown', cropPointerDown);
+  window.addEventListener('mousemove', cropPointerMove);
+  window.addEventListener('mouseup', cropPointerUp);
+  vp.addEventListener('touchstart', cropPointerDown, {passive:true});
+  vp.addEventListener('touchmove', cropPointerMove, {passive:false});
+  vp.addEventListener('touchend', cropPointerUp);
+}
+
+/* ============ 범용 옵션(색상/사이즈/수량) 행 엔진 ============ */
+function resetOptRows(formKey, existingOptions){
+  if(existingOptions && existingOptions.length){
+    ui.optRows[formKey] = existingOptions.map(o=>({ id:crypto.randomUUID(), color:o.color||'', size:o.size||'', qty:o.qty||1 }));
+  } else {
+    ui.optRows[formKey] = [
+      { id:crypto.randomUUID(), color:'', size:'', qty:1 },
+      { id:crypto.randomUUID(), color:'', size:'', qty:1 }
+    ];
+  }
+  renderOptRows(formKey);
+}
+function addOptRow(formKey){
+  ui.optRows[formKey].push({ id:crypto.randomUUID(), color:'', size:'', qty:1 });
+  renderOptRows(formKey);
+}
+function removeOptRow(formKey, id){
+  ui.optRows[formKey] = ui.optRows[formKey].filter(r=>r.id!==id);
+  if(ui.optRows[formKey].length===0) ui.optRows[formKey].push({ id:crypto.randomUUID(), color:'', size:'', qty:1 });
+  renderOptRows(formKey);
+}
+function updateOptRow(formKey, id, field, val){
+  const row = ui.optRows[formKey].find(r=>r.id===id);
+  if(row){ row[field] = field==='qty' ? val : val; }
+  refreshOptTotals(formKey);
+}
+function renderOptRows(formKey){
+  const wrap = document.getElementById(OPT_ROWS_CONTAINER[formKey]);
+  const rows = ui.optRows[formKey];
+  wrap.innerHTML = rows.map(r=>`
+    <div class="opt-row">
+      <input type="text" placeholder="색상" value="${escapeHtml(r.color)}" oninput="updateOptRow('${formKey}','${r.id}','color',this.value)">
+      <input type="text" placeholder="사이즈" value="${escapeHtml(r.size)}" oninput="this.value=this.value.toUpperCase(); updateOptRow('${formKey}','${r.id}','size',this.value)">
+      <input type="number" class="opt-qty" placeholder="수량" value="${r.qty}" oninput="updateOptRow('${formKey}','${r.id}','qty',this.value)">
+      ${rows.length>1 ? `<button class="opt-del" onclick="removeOptRow('${formKey}','${r.id}')">✕</button>` : ''}
+    </div>`).join('');
+  refreshOptTotals(formKey);
+}
+function calcOptRowsTotal(rows){
+  return rows.reduce((s,r)=> s + (Number(r.qty)||0), 0);
+}
+function refreshOptTotals(formKey){
+  const el = document.getElementById(OPT_TOTAL_EL[formKey]);
+  if(!el) return;
+  const priceEl = document.getElementById(OPT_PRICE_FIELD[formKey]);
+  const price = priceEl ? (Number(priceEl.value)||0) : 0;
+  const totalQty = calcOptRowsTotal(ui.optRows[formKey]);
+  el.innerHTML = `<div class="fee-row"><span>총 수량</span><span>${totalQty}개</span></div><div class="fee-row total"><span>총 금액</span><span>${fmtMoney(price*totalQty)}</span></div>`;
+}
+function optionsSummary(options){
+  if(!options || !options.length) return '';
+  return options.map(o=>{
+    const opt = [o.color, o.size].filter(Boolean).join('/');
+    return opt ? `${opt} ×${o.qty||0}` : `×${o.qty||0}`;
+  }).join(', ');
+}
+function optionsTotalQty(options){ return (options||[]).reduce((s,o)=> s+(Number(o.qty)||0), 0); }
+
 function saveItem(){
   const name = document.getElementById('f_name').value.trim();
   if(!ui.formMajor){ showToast('대분류를 선택해주세요'); return; }
   if(!name){ showToast('상품명을 입력해주세요'); return; }
+  const options = ui.optRows.item.map(r=>({ color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||0 }));
   const data = {
     category: ui.formMajor, subcategory: ui.formMinor || '', name,
     price: Number(document.getElementById('f_price').value)||0,
-    color: document.getElementById('f_color').value.trim(),
-    size: document.getElementById('f_size').value.trim(),
+    options,
     mixRatio: document.getElementById('f_mix').value.trim(),
     wholesaler: document.getElementById('f_wholesaler').value,
     purchaseDate: document.getElementById('f_date').value,
@@ -781,16 +963,18 @@ function openItemDetail(id){
   ui.viewingItemId = id;
   const color = CAT_COLOR[it.category] || '#BAA6C1';
   let photoHtml = it.photos && it.photos.length ? `<div class="detail-photo-scroll">${it.photos.map(p=>`<img src="${p}">`).join('')}</div>` : '';
+  const totalQty = optionsTotalQty(it.options);
+  const optRows = (it.options||[]).map(o=>`<div class="detail-row"><span class="k">${escapeHtml([o.color,o.size].filter(Boolean).join(' / ')||'옵션')}</span><span class="v">${o.qty||0}개</span></div>`).join('');
   document.getElementById('itemDetailBody').innerHTML = `${photoHtml}
     <div style="margin-bottom:10px;"><span class="cat-badge" style="background:${color}">${it.category}${it.subcategory?' · '+it.subcategory:''}</span></div>
     <div class="detail-row"><span class="k">상품명</span><span class="v">${escapeHtml(it.name)}</span></div>
-    <div class="detail-row"><span class="k">금액</span><span class="v">${fmtMoney(it.price)}</span></div>
-    <div class="detail-row"><span class="k">색상</span><span class="v">${escapeHtml(it.color||'-')}</span></div>
-    <div class="detail-row"><span class="k">사이즈</span><span class="v">${escapeHtml(it.size||'-')}</span></div>
+    <div class="detail-row"><span class="k">단가</span><span class="v">${fmtMoney(it.price)}</span></div>
+    ${optRows}
     <div class="detail-row"><span class="k">혼용률</span><span class="v">${escapeHtml(it.mixRatio||'-')}</span></div>
     <div class="detail-row"><span class="k">구매처</span><span class="v">${escapeHtml(it.wholesaler||'-')}</span></div>
     <div class="detail-row"><span class="k">구매일</span><span class="v">${it.purchaseDate||'-'}</span></div>
-    ${it.memo ? `<div class="detail-row"><span class="k">메모</span><span class="v">${escapeHtml(it.memo)}</span></div>` : ''}`;
+    ${it.memo ? `<div class="detail-row"><span class="k">메모</span><span class="v">${escapeHtml(it.memo)}</span></div>` : ''}
+    <div class="fee-box"><div class="fee-row"><span>총 수량</span><span>${totalQty}개</span></div><div class="fee-row total"><span>총 금액</span><span>${fmtMoney((it.price||0)*totalQty)}</span></div></div>`;
   openModal('itemDetailModal');
 }
 function editCurrentItem(){ closeModal('itemDetailModal'); openItemEdit(ui.viewingItemId); }
@@ -813,14 +997,16 @@ function renderOrders(){
   let html = ''; let lastDate = null;
   list.forEach(o=>{
     if(o.orderDate !== lastDate){ html += `<div class="order-date-head">${o.orderDate||'날짜 미지정'}</div>`; lastDate = o.orderDate; }
-    const opt = [o.color, o.size].filter(Boolean).join(' / ');
+    const opt = optionsSummary(o.options);
+    const totalQty = optionsTotalQty(o.options);
     html += `<div class="order-line" onclick="openOrderEdit('${o.id}')">
       <div class="ol-info">
         <div class="ol-name">${escapeHtml(o.name)}</div>
         ${opt ? `<div class="ol-opt">${escapeHtml(opt)}</div>` : ''}
-        <div class="ol-sub">${escapeHtml(o.wholesaler||'-')} · ${fmtMoney(o.price)} × ${o.qty}</div>
+        <div class="ol-sub">${escapeHtml(o.wholesaler||'-')} · ${fmtMoney(o.price)} × ${totalQty} = ${fmtMoney((o.price||0)*totalQty)}</div>
+        ${o.backorder && o.backorderDate ? `<div class="ol-sub">미송 예정일: ${o.backorderDate}</div>` : ''}
       </div>
-      <div class="status-chip ${o.backorder?'back':'done'}" onclick="toggleOrderStatus(event,'${o.id}')">${o.backorder?'미송':'입고완료'}</div>
+      <div class="status-chip ${o.backorder?'back':'done'}" onclick="toggleOrderStatus(event,'${o.id}')">${o.backorder?'미송':'재고있음'}</div>
     </div>`;
   });
   wrap.innerHTML = html;
@@ -835,6 +1021,7 @@ function setOrderStatus(back){
   ui.formOrderBack = back;
   document.getElementById('o_status_done').classList.toggle('sel', !back);
   document.getElementById('o_status_back').classList.toggle('sel', back);
+  document.getElementById('o_backorderDateField').style.display = back ? 'block' : 'none';
 }
 function openOrderModal(){
   ui.editingOrderId = null; ui.formOrderBack = false;
@@ -842,11 +1029,10 @@ function openOrderModal(){
   document.getElementById('orderDeleteBtn').style.display = 'none';
   document.getElementById('o_date').value = new Date().toISOString().slice(0,10);
   document.getElementById('o_name').value = '';
-  document.getElementById('o_color').value = '';
-  document.getElementById('o_size').value = '';
-  document.getElementById('o_qty').value = '1';
   document.getElementById('o_price').value = '';
+  document.getElementById('o_backorderDate').value = '';
   document.getElementById('o_wholesaler').innerHTML = wholesalerOptionsHtml('');
+  resetOptRows('order', null);
   setOrderStatus(false);
   openModal('orderModal');
 }
@@ -857,22 +1043,22 @@ function openOrderEdit(id){
   document.getElementById('orderDeleteBtn').style.display = 'block';
   document.getElementById('o_date').value = o.orderDate || '';
   document.getElementById('o_name').value = o.name || '';
-  document.getElementById('o_color').value = o.color || '';
-  document.getElementById('o_size').value = o.size || '';
-  document.getElementById('o_qty').value = o.qty || 1;
   document.getElementById('o_price').value = o.price || '';
+  document.getElementById('o_backorderDate').value = o.backorderDate || '';
   document.getElementById('o_wholesaler').innerHTML = wholesalerOptionsHtml(o.wholesaler || '');
+  resetOptRows('order', o.options);
   setOrderStatus(o.backorder);
   openModal('orderModal');
 }
 function saveOrder(){
   const name = document.getElementById('o_name').value.trim();
   if(!name){ showToast('상품명을 입력해주세요'); return; }
+  const options = ui.optRows.order.map(r=>({ color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||0 }));
   const data = {
     orderDate: document.getElementById('o_date').value,
-    name, color: document.getElementById('o_color').value.trim(), size: document.getElementById('o_size').value.trim(),
-    qty: Number(document.getElementById('o_qty').value)||1, price: Number(document.getElementById('o_price').value)||0,
-    wholesaler: document.getElementById('o_wholesaler').value, backorder: ui.formOrderBack
+    name, options, price: Number(document.getElementById('o_price').value)||0,
+    wholesaler: document.getElementById('o_wholesaler').value, backorder: ui.formOrderBack,
+    backorderDate: ui.formOrderBack ? document.getElementById('o_backorderDate').value : ''
   };
   if(ui.editingOrderId){ const idx = state.orders.findIndex(o=>o.id===ui.editingOrderId); state.orders[idx] = Object.assign(state.orders[idx], data); }
   else { data.id = crypto.randomUUID(); state.orders.push(data); }
@@ -886,50 +1072,107 @@ function deleteCurrentOrder(){
 }
 
 /* ============ TAB4: 위시리스트 ============ */
+function renderWishCatFilter(){
+  const wrap = document.getElementById('wishCatFilter');
+  const cats = ["전체", ...Object.keys(CATEGORIES)];
+  wrap.innerHTML = cats.map(c=>`<div class="chip ${ui.wishCatFilter===c?'active':''}" onclick="setWishCatFilter('${c}')">${c}</div>`).join('');
+}
+function setWishCatFilter(c){ ui.wishCatFilter = c; renderWishCatFilter(); renderWishes(); }
 function renderWishes(){
   const q = document.getElementById('wishSearch').value.trim().toLowerCase();
   let list = state.wishes.slice().sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+  if(ui.wishCatFilter !== '전체') list = list.filter(w=> w.category === ui.wishCatFilter);
   if(q) list = list.filter(w=> (w.name||'').toLowerCase().includes(q) || (w.wholesaler||'').toLowerCase().includes(q));
   const wrap = document.getElementById('wishList');
   if(list.length===0){ wrap.innerHTML = `<div class="empty-state"><div class="emoji">⭐</div><p>찜해둔 상품이 없어요</p><p>+ 버튼으로 위시리스트를 추가해보세요</p></div>`; return; }
-  wrap.innerHTML = list.map(w=>`
-    <div class="wish-card" onclick="openWishDetail('${w.id}')">
-      <div class="wish-emoji">⭐</div>
+  wrap.innerHTML = list.map(w=>{
+    const thumb = w.photos && w.photos[0] ? `<img class="wish-emoji" style="object-fit:cover;" src="${w.photos[0]}">` : `<div class="wish-emoji">⭐</div>`;
+    const totalQty = optionsTotalQty(w.options);
+    const optSummary = optionsSummary(w.options);
+    return `<div class="wish-card" onclick="openWishDetail('${w.id}')">
+      ${thumb}
       <div class="wish-info">
         <div class="wi-name">${escapeHtml(w.name)}</div>
         <div class="wi-sub">${escapeHtml(w.wholesaler||'구매처 미지정')}</div>
-        <div class="wi-price">${fmtMoney(w.price)}</div>
+        ${optSummary ? `<div class="wi-sub">${escapeHtml(optSummary)}</div>` : ''}
+        <div class="wi-price">${fmtMoney((w.price||0)*totalQty)}${totalQty?` (총 ${totalQty}개)`:''}</div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+function buildWishMajorChips(){
+  document.getElementById('wishMajorCatGroup').innerHTML = Object.keys(CATEGORIES).map(c=>`<div class="select-chip" data-major="${c}" onclick="selectWishMajor('${c}')">${c}</div>`).join('');
+}
+function selectWishMajor(c){
+  ui.wishFormMajor = c; ui.wishFormMinor = null;
+  document.querySelectorAll('#wishMajorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.major === c));
+  renderWishMinorChips();
+}
+function renderWishMinorChips(){
+  const wrap = document.getElementById('wishMinorCatGroup');
+  if(!ui.wishFormMajor){ wrap.innerHTML = '<span style="font-size:12px;color:#b2b2c2;">대분류를 먼저 선택하세요</span>'; return; }
+  const subs = CATEGORIES[ui.wishFormMajor] || [];
+  wrap.innerHTML = subs.map(s=>`<div class="select-chip" data-minor="${s}" onclick="selectWishMinor('${s}')">${s}</div>`).join('');
+}
+function selectWishMinor(s){
+  ui.wishFormMinor = s;
+  document.querySelectorAll('#wishMinorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.minor === s));
 }
 function openWishModal(){
-  ui.editingWishId = null;
+  ui.editingWishId = null; ui.formWishPhotos = []; ui.wishFormMajor = null; ui.wishFormMinor = null;
   document.getElementById('wishModalTitle').textContent = '위시 등록';
   document.getElementById('wishDeleteBtn').style.display = 'none';
   document.getElementById('wi_name').value = '';
   document.getElementById('wi_price').value = '';
   document.getElementById('wi_memo').value = '';
   document.getElementById('wi_wholesaler').innerHTML = wholesalerOptionsHtml('').replace('선택 안함','미지정');
+  buildWishMajorChips(); renderWishMinorChips();
+  resetOptRows('wish', null);
+  renderWishPhotoRow();
   openModal('wishModal');
 }
 function openWishEdit(id){
   const w = state.wishes.find(x=>x.id===id); if(!w) return;
-  ui.editingWishId = id;
+  ui.editingWishId = id; ui.formWishPhotos = (w.photos||[]).slice();
+  ui.wishFormMajor = w.category || null; ui.wishFormMinor = w.subcategory || null;
   document.getElementById('wishModalTitle').textContent = '위시 수정';
   document.getElementById('wishDeleteBtn').style.display = 'block';
   document.getElementById('wi_name').value = w.name || '';
   document.getElementById('wi_price').value = w.price || '';
   document.getElementById('wi_memo').value = w.memo || '';
   document.getElementById('wi_wholesaler').innerHTML = wholesalerOptionsHtml(w.wholesaler || '').replace('선택 안함','미지정');
+  buildWishMajorChips();
+  document.querySelectorAll('#wishMajorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.major === w.category));
+  renderWishMinorChips();
+  document.querySelectorAll('#wishMinorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.minor === w.subcategory));
+  resetOptRows('wish', w.options);
+  renderWishPhotoRow();
   openModal('wishModal');
+}
+function renderWishPhotoRow(){
+  const wrap = document.getElementById('wishPhotoRow');
+  let html = ui.formWishPhotos.map((p,idx)=>`<div class="photo-slot"><img src="${p}"><button class="ed" onclick="editWishPhoto(${idx}, event)">✏</button><button class="rm" onclick="removeWishPhoto(${idx}, event)">✕</button></div>`).join('');
+  if(ui.formWishPhotos.length < 3) html += `<div class="photo-slot" onclick="document.getElementById('wishPhotoInput').click()">＋</div>`;
+  wrap.innerHTML = html;
+}
+function removeWishPhoto(idx, e){ e.stopPropagation(); ui.formWishPhotos.splice(idx,1); renderWishPhotoRow(); }
+function editWishPhoto(idx, e){ e.stopPropagation(); openCropper(ui.formWishPhotos[idx], (cropped)=>{ ui.formWishPhotos[idx] = cropped; renderWishPhotoRow(); }); }
+function handleWishPhotoUpload(e){
+  const file = e.target.files[0]; if(!file) return;
+  readFileAsDataURL(file, (rawUrl)=>{ openCropper(rawUrl, (cropped)=>{ if(ui.formWishPhotos.length < 3) ui.formWishPhotos.push(cropped); renderWishPhotoRow(); }); });
+  e.target.value = '';
 }
 function saveWish(){
   const name = document.getElementById('wi_name').value.trim();
   if(!name){ showToast('상품명을 입력해주세요'); return; }
+  const options = ui.optRows.wish.map(r=>({ color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||0 }));
   const data = {
+    category: ui.wishFormMajor || '', subcategory: ui.wishFormMinor || '',
     name, price: Number(document.getElementById('wi_price').value)||0,
+    options,
     wholesaler: document.getElementById('wi_wholesaler').value,
-    memo: document.getElementById('wi_memo').value.trim()
+    memo: document.getElementById('wi_memo').value.trim(),
+    photos: ui.formWishPhotos.slice()
   };
   if(ui.editingWishId){ const idx = state.wishes.findIndex(w=>w.id===ui.editingWishId); state.wishes[idx] = Object.assign(state.wishes[idx], data); }
   else { data.id = crypto.randomUUID(); data.createdAt = Date.now(); state.wishes.push(data); }
@@ -944,11 +1187,18 @@ function deleteCurrentWish(){
 function openWishDetail(id){
   const w = state.wishes.find(x=>x.id===id); if(!w) return;
   ui.viewingWishId = id;
-  document.getElementById('wishDetailBody').innerHTML = `
+  const photoHtml = w.photos && w.photos.length ? `<div class="detail-photo-scroll">${w.photos.map(p=>`<img src="${p}">`).join('')}</div>` : '';
+  const totalQty = optionsTotalQty(w.options);
+  const optRows = (w.options||[]).map(o=>`<div class="detail-row"><span class="k">${escapeHtml([o.color,o.size].filter(Boolean).join(' / ')||'옵션')}</span><span class="v">${o.qty||0}개</span></div>`).join('');
+  const color = CAT_COLOR[w.category] || '#BAA6C1';
+  document.getElementById('wishDetailBody').innerHTML = `${photoHtml}
+    ${w.category ? `<div style="margin-bottom:10px;"><span class="cat-badge" style="background:${color}">${w.category}${w.subcategory?' · '+w.subcategory:''}</span></div>` : ''}
     <div class="detail-row"><span class="k">상품명</span><span class="v">${escapeHtml(w.name)}</span></div>
-    <div class="detail-row"><span class="k">예상가격</span><span class="v">${fmtMoney(w.price)}</span></div>
+    <div class="detail-row"><span class="k">단가</span><span class="v">${fmtMoney(w.price)}</span></div>
+    ${optRows}
     <div class="detail-row"><span class="k">구매처</span><span class="v">${escapeHtml(w.wholesaler||'-')}</span></div>
-    ${w.memo ? `<div class="detail-row"><span class="k">메모</span><span class="v">${escapeHtml(w.memo)}</span></div>` : ''}`;
+    ${w.memo ? `<div class="detail-row"><span class="k">메모</span><span class="v">${escapeHtml(w.memo)}</span></div>` : ''}
+    <div class="fee-box"><div class="fee-row"><span>총 수량</span><span>${totalQty}개</span></div><div class="fee-row total"><span>총 금액</span><span>${fmtMoney((w.price||0)*totalQty)}</span></div></div>`;
   openModal('wishDetailModal');
 }
 function editCurrentWish(){ closeModal('wishDetailModal'); openWishEdit(ui.viewingWishId); }
@@ -960,17 +1210,13 @@ function convertWishToItem(){
   state.wishes = state.wishes.filter(x=>x.id!==id);
   saveLocal(); renderWishes(); pushToCloud();
   switchTab(1);
-  openItemModal({ name: w.name, price: w.price, wholesaler: w.wholesaler });
+  openItemModal({ name: w.name, price: w.price, wholesaler: w.wholesaler, options: w.options, photos: w.photos });
   showToast('구매완료 탭에서 마저 입력해주세요');
 }
 
 /* ============ TAB5: 사입삼촌 ============ */
-function toggleSaipStatus(type){
-  if(type==='daenap'){ ui.formSaipDaenap = !ui.formSaipDaenap; document.getElementById('sp_daenap').classList.toggle('sel', ui.formSaipDaenap); }
-  else { ui.formSaipWannap = !ui.formSaipWannap; document.getElementById('sp_wannap').classList.toggle('sel', ui.formSaipWannap); }
-}
 function addSaipRow(row){
-  ui.formSaipRows.push(row || { id: crypto.randomUUID(), name:'', price:'', color:'', size:'', shopName:'', building:'', floor:'', unit:'' });
+  ui.formSaipRows.push(row || { id: crypto.randomUUID(), name:'', price:'', color:'', size:'', qty:1, shopName:'', building:'', floor:'', unit:'', status:'wannap' });
   renderSaipRows();
 }
 function removeSaipRow(id){
@@ -982,6 +1228,10 @@ function updateSaipRow(id, field, val){
   const r = ui.formSaipRows.find(x=>x.id===id);
   if(r){ r[field] = val; updateSaipFeePreview(); }
 }
+function setSaipRowStatus(id, status){
+  const r = ui.formSaipRows.find(x=>x.id===id);
+  if(r){ r.status = status; renderSaipRows(); }
+}
 function renderSaipRows(){
   const wrap = document.getElementById('saipRows');
   wrap.innerHTML = ui.formSaipRows.map((r,idx)=>`
@@ -990,65 +1240,71 @@ function renderSaipRows(){
       ${ui.formSaipRows.length>1 ? `<button class="row-del" onclick="removeSaipRow('${r.id}')">✕</button>` : ''}
       <div class="field-row" style="margin-bottom:8px;">
         <div class="field" style="margin-bottom:0;"><label>상품명</label><input type="text" value="${escapeHtml(r.name)}" oninput="updateSaipRow('${r.id}','name',this.value)" placeholder="상품명"></div>
-        <div class="field" style="margin-bottom:0;"><label>가격(₩)</label><input type="number" value="${r.price}" oninput="updateSaipRow('${r.id}','price',this.value)" placeholder="0"></div>
+        <div class="field" style="margin-bottom:0;"><label>단가</label><input type="number" value="${r.price}" oninput="updateSaipRow('${r.id}','price',this.value)" placeholder="0"></div>
       </div>
       <div class="field-row" style="margin-bottom:8px;">
-        <div class="field" style="margin-bottom:0;"><label>칼라</label><input type="text" value="${escapeHtml(r.color)}" oninput="updateSaipRow('${r.id}','color',this.value)" placeholder="칼라"></div>
-        <div class="field" style="margin-bottom:0;"><label>사이즈</label><input type="text" value="${escapeHtml(r.size)}" oninput="updateSaipRow('${r.id}','size',this.value)" placeholder="사이즈"></div>
+        <div class="field" style="margin-bottom:0;"><label>색상</label><input type="text" value="${escapeHtml(r.color)}" oninput="updateSaipRow('${r.id}','color',this.value)" placeholder="색상"></div>
+        <div class="field" style="margin-bottom:0;"><label>사이즈</label><input type="text" value="${escapeHtml(r.size)}" oninput="this.value=this.value.toUpperCase(); updateSaipRow('${r.id}','size',this.value)" placeholder="사이즈"></div>
+        <div class="field" style="margin-bottom:0; max-width:70px;"><label>수량</label><input type="number" value="${r.qty||1}" oninput="updateSaipRow('${r.id}','qty',this.value)" placeholder="1"></div>
       </div>
       <div class="field" style="margin-bottom:8px;"><label>상호명</label><input type="text" value="${escapeHtml(r.shopName)}" oninput="updateSaipRow('${r.id}','shopName',this.value)" placeholder="상호명"></div>
-      <div class="field-row">
+      <div class="field-row" style="margin-bottom:8px;">
         <div class="field" style="margin-bottom:0;"><label>건물</label><input type="text" value="${escapeHtml(r.building)}" oninput="updateSaipRow('${r.id}','building',this.value)" placeholder="건물"></div>
         <div class="field" style="margin-bottom:0;"><label>층</label><input type="text" value="${escapeHtml(r.floor)}" oninput="updateSaipRow('${r.id}','floor',this.value)" placeholder="층"></div>
-        <div class="field" style="margin-bottom:0;"><label>호</label><input type="text" value="${escapeHtml(r.unit)}" oninput="updateSaipRow('${r.id}','unit',this.value)" placeholder="호"></div>
+        <div class="field" style="margin-bottom:0;"><label>호</label><input type="text" value="${escapeHtml(r.unit)}" oninput="this.value=this.value.toUpperCase(); updateSaipRow('${r.id}','unit',this.value)" placeholder="호"></div>
+      </div>
+      <div class="field" style="margin-bottom:0;">
+        <label>대납 / 완납</label>
+        <div class="select-chip-group">
+          <div class="select-chip ${r.status==='daenap'?'sel':''}" onclick="setSaipRowStatus('${r.id}','daenap')">대납</div>
+          <div class="select-chip ${r.status!=='daenap'?'sel':''}" onclick="setSaipRowStatus('${r.id}','wannap')">완납</div>
+        </div>
       </div>
     </div>`).join('');
   updateSaipFeePreview();
 }
 function calcSaipFee(rows){
-  const itemTotal = rows.reduce((s,r)=> s + (Number(r.price)||0), 0);
+  const daenapTotal = rows.filter(r=>r.status==='daenap').reduce((s,r)=> s + (Number(r.price)||0)*(Number(r.qty)||0), 0);
+  const wannapTotal = rows.filter(r=>r.status!=='daenap').reduce((s,r)=> s + (Number(r.price)||0)*(Number(r.qty)||0), 0);
   const shopSet = new Set(rows.map(r=> (r.shopName||'').trim()).filter(Boolean));
   const shopCount = shopSet.size;
   const fee = shopCount * SAIP_FEE_PER_SHOP + (rows.length ? SAIP_SHIPPING_FEE : 0);
-  return { itemTotal, shopCount, fee, grandTotal: itemTotal + fee };
+  return { daenapTotal, wannapTotal, shopCount, fee, grandTotal: daenapTotal + fee };
 }
 function updateSaipFeePreview(){
   const r = calcSaipFee(ui.formSaipRows);
   document.getElementById('saipFeePreview').innerHTML = `
-    <div class="fee-row"><span>상품 금액 합계</span><span>${fmtMoney(r.itemTotal)}</span></div>
+    <div class="fee-row"><span>대납 상품 합계</span><span>${fmtMoney(r.daenapTotal)}</span></div>
+    <div class="fee-row"><span>완납 상품 합계 (별도 정산됨)</span><span>${fmtMoney(r.wannapTotal)}</span></div>
     <div class="fee-row"><span>거래처 수수료 (${r.shopCount}곳 × 2,000원)</span><span>${fmtMoney(r.shopCount*SAIP_FEE_PER_SHOP)}</span></div>
     <div class="fee-row"><span>택배비</span><span>${fmtMoney(ui.formSaipRows.length?SAIP_SHIPPING_FEE:0)}</span></div>
-    <div class="fee-row total"><span>총 결제금액</span><span>${fmtMoney(r.grandTotal)}</span></div>`;
+    <div class="fee-row total"><span>총 결제금액 (대납분+수수료)</span><span>${fmtMoney(r.grandTotal)}</span></div>`;
 }
 function openSaipModal(){
-  ui.editingSaipId = null; ui.formSaipDaenap = false; ui.formSaipWannap = false; ui.formSaipRows = [];
+  ui.editingSaipId = null; ui.formSaipRows = [];
   document.getElementById('saipModalTitle').textContent = '사입 신청 등록';
   document.getElementById('saipDeleteBtn').style.display = 'none';
   document.getElementById('sp_date').value = new Date().toISOString().slice(0,10);
-  document.getElementById('sp_daenap').classList.remove('sel');
-  document.getElementById('sp_wannap').classList.remove('sel');
   addSaipRow();
   openModal('saipModal');
 }
 function openSaipEdit(id){
   const s = state.saips.find(x=>x.id===id); if(!s) return;
-  ui.editingSaipId = id; ui.formSaipDaenap = !!s.daenap; ui.formSaipWannap = !!s.wannap;
-  ui.formSaipRows = (s.items||[]).map(it=>Object.assign({id:crypto.randomUUID()}, it));
+  ui.editingSaipId = id;
+  ui.formSaipRows = (s.items||[]).map(it=>Object.assign({id:crypto.randomUUID(), status: it.status || 'wannap'}, it));
   document.getElementById('saipModalTitle').textContent = '사입 신청 수정';
   document.getElementById('saipDeleteBtn').style.display = 'block';
   document.getElementById('sp_date').value = s.applyDate || '';
-  document.getElementById('sp_daenap').classList.toggle('sel', ui.formSaipDaenap);
-  document.getElementById('sp_wannap').classList.toggle('sel', ui.formSaipWannap);
   if(ui.formSaipRows.length===0) addSaipRow(); else renderSaipRows();
   openModal('saipModal');
 }
 function saveSaip(){
   if(ui.formSaipRows.every(r=>!r.name.trim())){ showToast('상품을 1개 이상 입력해주세요'); return; }
   const items = ui.formSaipRows.filter(r=>r.name.trim()).map(r=>({
-    name:r.name.trim(), price:Number(r.price)||0, color:r.color.trim(), size:r.size.trim(),
-    shopName:r.shopName.trim(), building:r.building.trim(), floor:r.floor.trim(), unit:r.unit.trim()
+    name:r.name.trim(), price:Number(r.price)||0, color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||1,
+    shopName:r.shopName.trim(), building:r.building.trim(), floor:r.floor.trim(), unit:r.unit.trim(), status: r.status==='daenap'?'daenap':'wannap'
   }));
-  const data = { applyDate: document.getElementById('sp_date').value, items, daenap: ui.formSaipDaenap, wannap: ui.formSaipWannap };
+  const data = { applyDate: document.getElementById('sp_date').value, items };
   if(ui.editingSaipId){ const idx = state.saips.findIndex(s=>s.id===ui.editingSaipId); state.saips[idx] = Object.assign(state.saips[idx], data); }
   else { data.id = crypto.randomUUID(); state.saips.push(data); }
   saveLocal(); renderSaips(); closeModal('saipModal'); showToast('저장했어요'); pushToCloud();
@@ -1067,10 +1323,11 @@ function renderSaips(){
   if(list.length===0){ wrap.innerHTML = `<div class="empty-state"><div class="emoji">🧾</div><p>등록된 사입 신청이 없어요</p><p>+ 버튼으로 신청건을 추가해보세요</p></div>`; return; }
   wrap.innerHTML = list.map(s=>{
     const r = calcSaipFee(s.items||[]);
+    const daenapCount = (s.items||[]).filter(it=>it.status==='daenap').length;
+    const wannapCount = (s.items||[]).length - daenapCount;
     let badges = '';
-    if(s.daenap) badges += `<span class="b-daenap">대납</span>`;
-    if(s.wannap) badges += `<span class="b-wannap">완납</span>`;
-    if(!s.daenap && !s.wannap) badges += `<span class="b-none">미정산</span>`;
+    if(daenapCount) badges += `<span class="b-daenap">대납 ${daenapCount}</span>`;
+    if(wannapCount) badges += `<span class="b-wannap">완납 ${wannapCount}</span>`;
     return `<div class="saip-card" onclick="openSaipDetail('${s.id}')">
       <div class="saip-top"><span class="saip-date">${s.applyDate||'날짜 미지정'}</span><span class="saip-badges">${badges}</span></div>
       <div class="saip-meta">상품 ${((s.items||[]).length)}건 · 거래처 ${r.shopCount}곳</div>
@@ -1085,26 +1342,23 @@ function openSaipDetail(id){
   const itemsHtml = (s.items||[]).map(it=>{
     const opt = [it.color, it.size].filter(Boolean).join(' / ');
     const loc = [it.building, it.floor, it.unit].filter(Boolean).join(' ');
+    const badge = it.status==='daenap' ? `<span class="b-daenap">대납</span>` : `<span class="b-wannap">완납</span>`;
     return `<div class="sit-row">
-      <div class="sit-name">${escapeHtml(it.name)} · ${fmtMoney(it.price)}</div>
+      <div class="sit-name">${escapeHtml(it.name)} · ${fmtMoney(it.price)} × ${it.qty||1} ${badge}</div>
       <div class="sit-sub">${opt ? escapeHtml(opt)+' · ' : ''}${escapeHtml(it.shopName||'-')} ${loc ? '('+escapeHtml(loc)+')' : ''}</div>
     </div>`;
   }).join('');
-  let badges = '';
-  if(s.daenap) badges += `<span class="b-daenap">대납</span>`;
-  if(s.wannap) badges += `<span class="b-wannap">완납</span>`;
-  if(!s.daenap && !s.wannap) badges += `<span class="b-none">미정산</span>`;
   document.getElementById('saipDetailBody').innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+    <div style="margin-bottom:12px;">
       <span style="font-size:16px; font-weight:800; color:var(--navy);">${s.applyDate||'날짜 미지정'}</span>
-      <span>${badges}</span>
     </div>
     <div class="saip-item-table">${itemsHtml}</div>
     <div class="fee-box" style="margin-top:12px;">
-      <div class="fee-row"><span>상품 금액 합계</span><span>${fmtMoney(r.itemTotal)}</span></div>
+      <div class="fee-row"><span>대납 상품 합계</span><span>${fmtMoney(r.daenapTotal)}</span></div>
+      <div class="fee-row"><span>완납 상품 합계 (별도 정산됨)</span><span>${fmtMoney(r.wannapTotal)}</span></div>
       <div class="fee-row"><span>거래처 수수료 (${r.shopCount}곳 × 2,000원)</span><span>${fmtMoney(r.shopCount*SAIP_FEE_PER_SHOP)}</span></div>
       <div class="fee-row"><span>택배비</span><span>${fmtMoney((s.items||[]).length?SAIP_SHIPPING_FEE:0)}</span></div>
-      <div class="fee-row total"><span>총 결제금액</span><span>${fmtMoney(r.grandTotal)}</span></div>
+      <div class="fee-row total"><span>총 결제금액 (대납분+수수료)</span><span>${fmtMoney(r.grandTotal)}</span></div>
     </div>`;
   openModal('saipDetailModal');
 }
@@ -1228,12 +1482,13 @@ function renderQuoteWholesalerOptions(){
 function addQuoteItem(){
   const name = document.getElementById('qName').value.trim();
   const price = Number(document.getElementById('qPrice').value)||0;
-  const qty = Number(document.getElementById('qQty').value)||1;
   const wholesaler = document.getElementById('qWholesaler').value;
   if(!name){ showToast('상품명을 입력해주세요'); return; }
-  state.quotes.push({ id: crypto.randomUUID(), name, price, qty, wholesaler });
+  const options = ui.optRows.quote.map(r=>({ color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||0 }));
+  state.quotes.push({ id: crypto.randomUUID(), name, price, options, wholesaler });
   saveLocal();
-  document.getElementById('qName').value=''; document.getElementById('qPrice').value=''; document.getElementById('qQty').value='1'; document.getElementById('qWholesaler').value='';
+  document.getElementById('qName').value=''; document.getElementById('qPrice').value=''; document.getElementById('qWholesaler').value='';
+  resetOptRows('quote', null);
   renderQuotes(); pushToCloud();
 }
 function removeQuoteItem(id){ state.quotes = state.quotes.filter(q=>q.id!==id); saveLocal(); renderQuotes(); pushToCloud(); }
@@ -1247,8 +1502,10 @@ function renderQuotes(){
   Object.keys(groups).forEach(key=>{
     const items = groups[key]; let subtotal = 0;
     let itemsHtml = items.map(q=>{
-      const lineTotal = q.price * q.qty; subtotal += lineTotal;
-      return `<div class="quote-item"><div class="qi-info"><div class="qi-name">${escapeHtml(q.name)}</div><div class="qi-sub">${fmtMoney(q.price)} × ${q.qty}</div></div><div class="qi-total">${fmtMoney(lineTotal)}</div><button class="qi-del" onclick="removeQuoteItem('${q.id}')">✕</button></div>`;
+      const qty = optionsTotalQty(q.options);
+      const lineTotal = q.price * qty; subtotal += lineTotal;
+      const optSummary = optionsSummary(q.options);
+      return `<div class="quote-item"><div class="qi-info"><div class="qi-name">${escapeHtml(q.name)}</div><div class="qi-sub">${fmtMoney(q.price)} × ${qty}${optSummary? ' · '+escapeHtml(optSummary):''}</div></div><div class="qi-total">${fmtMoney(lineTotal)}</div><button class="qi-del" onclick="removeQuoteItem('${q.id}')">✕</button></div>`;
     }).join('');
     grandTotal += subtotal;
     html += `<div class="quote-group"><div class="quote-group-head"><span>${escapeHtml(key)}</span><span class="sub-total">${fmtMoney(subtotal)}</span></div>${itemsHtml}</div>`;

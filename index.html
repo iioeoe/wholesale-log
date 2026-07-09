@@ -858,13 +858,13 @@ function confirmCrop(){
   const srcX = -cropState.offsetX / displayScale;
   const srcY = -cropState.offsetY / displayScale;
   const srcSize = cropState.VP / displayScale;
-  const outSize = 700;
+  const outSize = 480;
   const canvas = document.createElement('canvas');
   canvas.width = outSize; canvas.height = outSize;
   const ctx = canvas.getContext('2d');
   const imgEl = document.getElementById('cropImg');
   ctx.drawImage(imgEl, srcX, srcY, srcSize, srcSize, 0, 0, outSize, outSize);
-  const result = canvas.toDataURL('image/jpeg', 0.75);
+  const result = canvas.toDataURL('image/jpeg', 0.55);
   const cb = cropState.onDone;
   closeModal('cropModal');
   cropState.onDone = null;
@@ -1546,11 +1546,15 @@ async function pushToCloud(silent){
   if(!state.settings.binId || !state.settings.apiKey) return;
   try{
     const payload = { items: state.items, wholesalers: state.wholesalers, buildings: state.buildings, quotes: state.quotes, orders: state.orders, wishes: state.wishes, saips: state.saips };
+    const body = JSON.stringify(payload);
     const res = await fetch('https://api.jsonbin.io/v3/b/'+state.settings.binId, {
-      method:'PUT', headers:{ 'Content-Type':'application/json', 'X-Master-Key': state.settings.apiKey }, body: JSON.stringify(payload)
+      method:'PUT', headers:{ 'Content-Type':'application/json', 'X-Master-Key': state.settings.apiKey }, body
     });
     if(res.ok){ state.settings.lastSync = Date.now(); saveLocal(); updateSyncInfo(); if(!silent) showToast('클라우드에 저장했어요'); }
-    else { if(!silent) showToast('동기화 실패 (Bin ID/Key 확인)'); }
+    else if(res.status === 413){ if(!silent) showToast('사진 용량이 너무 커요. 사진을 줄이거나 화질을 낮춰주세요'); }
+    else if(res.status === 401 || res.status === 403){ if(!silent) showToast('Key가 올바르지 않아요 (⚙ 설정 확인)'); }
+    else if(res.status === 404){ if(!silent) showToast('Bin ID를 찾을 수 없어요 (⚙ 설정 확인)'); }
+    else { if(!silent) showToast('동기화 실패 (status '+res.status+')'); }
   }catch(e){ if(!silent) showToast('네트워크 오류로 동기화 실패'); }
 }
 async function pullFromCloud(manual){

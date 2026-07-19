@@ -1669,16 +1669,19 @@ async function pushToCloud(silent){
       method:'PUT', headers:{ 'Content-Type':'application/json', 'X-Master-Key': state.settings.apiKey }, body
     });
     if(res.ok){ state.settings.lastSync = Date.now(); state.settings.dirty = false; saveLocal(); updateSyncInfo(); if(!silent) showToast('클라우드에 저장했어요'); }
-    else if(res.status === 413){ if(!silent) showToast('사진 용량이 너무 커요. 사진을 줄이거나 화질을 낮춰주세요'); }
-    else if(res.status === 401 || res.status === 403){ if(!silent) showToast('Key가 올바르지 않아요 (⚙ 설정 확인)'); }
-    else if(res.status === 404){ if(!silent) showToast('Bin ID를 찾을 수 없어요 (⚙ 설정 확인)'); }
-    else { if(!silent) showToast('동기화 실패 (status '+res.status+')'); }
-  }catch(e){ if(!silent) showToast('네트워크 오류로 동기화 실패'); }
+    else {
+      let detail = '';
+      try{ const errJson = await res.json(); detail = errJson.message || JSON.stringify(errJson); }catch(e2){ try{ detail = await res.text(); }catch(e3){} }
+      const sizeKb = Math.round(body.length/1024);
+      console.error('JSONBin push failed', res.status, detail, '요청 크기(KB):', sizeKb);
+      if(!silent) showToast(`동기화 실패 (${res.status}) ${detail ? detail.slice(0,60) : ''} · 요청 ${sizeKb}KB`);
+    }
+  }catch(e){ if(!silent) showToast('네트워크 오류로 동기화 실패: '+e.message); }
 }
 async function pullFromCloud(manual){
-  if(!state.settings.binId){ if(manual) showToast('Bin ID를 먼저 입력해주세요'); return; }
-  const key = document.getElementById('s_apiKey').value.trim() || state.settings.apiKey;
   const binId = document.getElementById('s_binId').value.trim() || state.settings.binId;
+  const key = document.getElementById('s_apiKey').value.trim() || state.settings.apiKey;
+  if(!binId){ if(manual) showToast('Bin ID를 먼저 입력해주세요'); return; }
   try{
     const res = await fetch('https://api.jsonbin.io/v3/b/'+binId+'/latest', { headers: key ? { 'X-Master-Key': key } : {} });
     if(res.ok){

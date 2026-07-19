@@ -157,7 +157,7 @@ body{
 .quote-item .qi-sub{ font-size:11px; color:var(--gray); margin-top:2px; }
 .quote-item .qi-total{ font-size:13.5px; font-weight:800; color:var(--navy); }
 .qi-del{ border:none; background:transparent; color:var(--danger); font-size:17px; cursor:pointer; padding:2px 4px; }
-.quote-total-bar{ position:sticky; bottom: 88px; z-index:20; margin-top:14px; background: var(--accent); color:#fff; border-radius: 16px; padding: 14px 18px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 8px 20px rgba(20,35,109,0.25); }
+.quote-total-bar{ margin: 4px 0 14px; z-index:1; background: var(--accent); color:#fff; border-radius: 16px; padding: 14px 18px; display:flex; justify-content:space-between; align-items:center; box-shadow: 0 8px 20px rgba(20,35,109,0.25); }
 .quote-total-bar .label{ font-size:12px; opacity:0.9; }
 .quote-total-bar .amount{ font-size:19px; font-weight:800; }
 .quote-total-bar button{ border:none; background:rgba(255,255,255,0.25); color:#fff; font-size:11.5px; padding:7px 12px; border-radius:10px; font-weight:700; cursor:pointer; }
@@ -297,6 +297,7 @@ body{
       <div class="opt-total-box" id="quoteOptTotal"></div>
       <button class="btn btn-primary" style="width:100%; margin-top:12px;" onclick="addQuoteItem()">+ 후보에 담기</button>
     </div>
+    <div id="quoteTotalBarSlot"></div>
     <div id="quoteList"></div>
     <div id="quoteEmpty" class="empty-state" style="display:none;"><div class="emoji">🧮</div><p>구매 전 후보 상품을 담아보세요</p><p>구매처별로 합계가 자동 계산돼요</p></div>
   </div>
@@ -432,10 +433,13 @@ body{
     <div class="modal-head"><h2>위시 상세</h2><button class="modal-close" onclick="closeModal('wishDetailModal')">✕</button></div>
     <div id="wishDetailBody"></div>
     <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="editCurrentWish()">수정</button>
+      <button class="btn btn-outline" onclick="editCurrentWish()">수정</button>
+      <button class="btn btn-outline" onclick="deleteWishDirect()">삭제</button>
+    </div>
+    <div class="modal-actions" style="margin-top:10px;">
+      <button class="btn btn-primary" onclick="convertWishToOrder()">주문내역 전환</button>
       <button class="btn btn-primary" onclick="convertWishToItem()">구매완료 전환</button>
     </div>
-    <button class="btn btn-outline" style="width:100%; margin-top:10px;" onclick="convertWishToOrder()">주문내역으로 전환</button>
   </div>
 </div>
 
@@ -645,7 +649,7 @@ function loadLocal(){
 function saveLocal(){ localStorage.setItem('wsl_data', JSON.stringify(state)); }
 
 /* ============ 초기화 ============ */
-function init(){
+async function init(){
   loadLocal();
   setAccent(1);
   document.getElementById('s_binId').value = state.settings.binId || "";
@@ -665,7 +669,18 @@ function init(){
   renderWishes();
   renderSaips();
   initCropperEvents();
-  if(state.settings.binId && state.settings.apiKey){ pullFromCloud(false); }
+  if(state.settings.binId && state.settings.apiKey){
+    if(state.settings.dirty){
+      await pushToCloud(true);
+      if(!state.settings.dirty){
+        await pullFromCloud(false);
+      } else {
+        showToast('아직 클라우드에 반영 안 된 변경사항이 있어요 (⚙ 설정 확인)');
+      }
+    } else {
+      await pullFromCloud(false);
+    }
+  }
 }
 
 /* ============ 탭 전환 ============ */
@@ -867,13 +882,13 @@ function confirmCrop(){
   const srcX = -cropState.offsetX / displayScale;
   const srcY = -cropState.offsetY / displayScale;
   const srcSize = cropState.VP / displayScale;
-  const outSize = 480;
+  const outSize = 360;
   const canvas = document.createElement('canvas');
   canvas.width = outSize; canvas.height = outSize;
   const ctx = canvas.getContext('2d');
   const imgEl = document.getElementById('cropImg');
   ctx.drawImage(imgEl, srcX, srcY, srcSize, srcSize, 0, 0, outSize, outSize);
-  const result = canvas.toDataURL('image/jpeg', 0.55);
+  const result = canvas.toDataURL('image/jpeg', 0.45);
   const cb = cropState.onDone;
   closeModal('cropModal');
   cropState.onDone = null;
@@ -1200,6 +1215,12 @@ function deleteCurrentWish(){
   if(!confirm('이 위시를 삭제할까요?')) return;
   state.wishes = state.wishes.filter(w=>w.id!==ui.editingWishId);
   saveLocal(); renderWishes(); closeModal('wishModal'); showToast('삭제했어요'); pushToCloud();
+}
+function deleteWishDirect(){
+  const id = ui.viewingWishId; if(!id) return;
+  if(!confirm('이 위시를 삭제할까요?')) return;
+  state.wishes = state.wishes.filter(w=>w.id!==id);
+  saveLocal(); renderWishes(); closeModal('wishDetailModal'); showToast('삭제했어요'); pushToCloud();
 }
 function openWishDetail(id){
   const w = state.wishes.find(x=>x.id===id); if(!w) return;
@@ -1615,7 +1636,7 @@ function renderQuotes(){
 }
 function renderTotalBar(total){
   let bar = document.getElementById('quoteTotalBar');
-  if(!bar){ bar = document.createElement('div'); bar.id = 'quoteTotalBar'; bar.className = 'quote-total-bar'; document.getElementById('panel-3').appendChild(bar); }
+  if(!bar){ bar = document.createElement('div'); bar.id = 'quoteTotalBar'; bar.className = 'quote-total-bar'; document.getElementById('quoteTotalBarSlot').appendChild(bar); }
   bar.innerHTML = `<div><div class="label">총 합계 (${state.quotes.length}개)</div><div class="amount">${fmtMoney(total)}</div></div><button onclick="clearQuotes()">전체 초기화</button>`;
 }
 function removeTotalBar(){ const bar = document.getElementById('quoteTotalBar'); if(bar) bar.remove(); }
@@ -1628,7 +1649,8 @@ function openSettings(){
   updateSyncInfo(); openModal('settingsModal');
 }
 function updateSyncInfo(){
-  document.getElementById('syncInfo').textContent = state.settings.lastSync ? `마지막 동기화: ${new Date(state.settings.lastSync).toLocaleString('ko-KR')}` : '아직 동기화하지 않았어요';
+  const base = state.settings.lastSync ? `마지막 동기화: ${new Date(state.settings.lastSync).toLocaleString('ko-KR')}` : '아직 동기화하지 않았어요';
+  document.getElementById('syncInfo').textContent = state.settings.dirty ? `⚠️ 아직 클라우드에 반영 안 된 변경사항이 있어요 (${base})` : base;
 }
 function saveSettingsAndPush(){
   state.settings.binId = document.getElementById('s_binId').value.trim();
@@ -1639,13 +1661,14 @@ function saveSettingsAndPush(){
 }
 async function pushToCloud(silent){
   if(!state.settings.binId || !state.settings.apiKey) return;
+  state.settings.dirty = true; saveLocal();
   try{
     const payload = { items: state.items, wholesalers: state.wholesalers, buildings: state.buildings, quotes: state.quotes, orders: state.orders, wishes: state.wishes, saips: state.saips };
     const body = JSON.stringify(payload);
     const res = await fetch('https://api.jsonbin.io/v3/b/'+state.settings.binId, {
       method:'PUT', headers:{ 'Content-Type':'application/json', 'X-Master-Key': state.settings.apiKey }, body
     });
-    if(res.ok){ state.settings.lastSync = Date.now(); saveLocal(); updateSyncInfo(); if(!silent) showToast('클라우드에 저장했어요'); }
+    if(res.ok){ state.settings.lastSync = Date.now(); state.settings.dirty = false; saveLocal(); updateSyncInfo(); if(!silent) showToast('클라우드에 저장했어요'); }
     else if(res.status === 413){ if(!silent) showToast('사진 용량이 너무 커요. 사진을 줄이거나 화질을 낮춰주세요'); }
     else if(res.status === 401 || res.status === 403){ if(!silent) showToast('Key가 올바르지 않아요 (⚙ 설정 확인)'); }
     else if(res.status === 404){ if(!silent) showToast('Bin ID를 찾을 수 없어요 (⚙ 설정 확인)'); }

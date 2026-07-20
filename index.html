@@ -1689,7 +1689,7 @@ async function pullFromCloud(manual){
       state.items = rec.items || []; state.wholesalers = rec.wholesalers || [];
       state.buildings = rec.buildings && rec.buildings.length ? rec.buildings : ["디오트"];
       state.quotes = rec.quotes || []; state.orders = rec.orders || []; state.wishes = rec.wishes || []; state.saips = rec.saips || [];
-      state.settings.binId = binId; state.settings.apiKey = key; state.settings.lastSync = Date.now();
+      state.settings.binId = binId; state.settings.apiKey = key; state.settings.lastSync = Date.now(); state.settings.dirty = false;
       saveLocal();
       renderItemCatFilter(); renderBuildingFilter(); renderOrderStatusFilter();
       renderItems(); renderWholesalers(); renderQuoteWholesalerOptions(); renderQuotes();

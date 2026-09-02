@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#C79BD6">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -42,7 +42,7 @@ body{
 }
 
 
-#app{ width:100%; max-width: var(--app-max); min-height:100vh; position:relative; padding-bottom: 130px; }
+#app{ width:100%; max-width: var(--app-max); min-height:100vh; position:relative; padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
 .topbar{
   position:sticky; top:0; z-index:30; padding: 18px 18px 12px;
   display:flex; align-items:center; justify-content:space-between;
@@ -164,7 +164,7 @@ body{
 
 /* ---------- Bottom tab bar ---------- */
 .tabbar{
-  position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
+  position:fixed; left:50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform:translateX(-50%);
   width: calc(100% - 24px); max-width: calc(var(--app-max) - 24px);
   display:flex; background: rgba(255,255,255,0.55);
   backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
@@ -177,7 +177,7 @@ body{
 .tab-btn.active{ background: var(--accent); color:#fff; }
 
 /* ---------- FAB ---------- */
-.fab{ position:fixed; right:50%; bottom: 96px; transform: translateX(calc(var(--app-max)/2 - 56px)); width:52px; height:52px; border-radius:50%; border:none; background: var(--accent); color:#fff; font-size:26px; cursor:pointer; box-shadow: 0 8px 18px rgba(20,35,109,0.3); z-index:39; display:flex; align-items:center; justify-content:center; transition: background 0.25s ease; }
+.fab{ position:fixed; right:50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(calc(var(--app-max)/2 - 56px)); width:52px; height:52px; border-radius:50%; border:none; background: var(--accent); color:#fff; font-size:26px; cursor:pointer; box-shadow: 0 8px 18px rgba(20,35,109,0.3); z-index:39; display:flex; align-items:center; justify-content:center; transition: background 0.25s ease; }
 @media (max-width: 560px){ .fab{ transform:none; right:20px; } }
 .fab:active{ transform: scale(0.92); }
 

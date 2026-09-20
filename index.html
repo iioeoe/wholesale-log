@@ -286,6 +286,7 @@ body{
   <!-- TAB 3: 견적 계산기 -->
   <div class="tab-panel" id="panel-3">
     <div class="quote-form">
+      <button class="btn btn-outline" style="width:100%; margin-bottom:12px;" onclick="openWishPicker()">⭐ 위시에서 불러오기</button>
       <div class="field" style="margin-bottom:8px;"><label>상품명</label><input type="text" id="qName" placeholder="예: 니트 원피스"></div>
       <div class="field" style="margin-bottom:8px;"><label>단가</label><input type="number" id="qPrice" placeholder="0" oninput="refreshOptTotals('quote')"></div>
       <div class="field" style="margin-bottom:8px;">
@@ -350,7 +351,7 @@ body{
     </div>
     <div class="field"><label>혼용률</label><input type="text" id="f_mix" placeholder="예: 폴리 80% 스판 20%"></div>
     <div class="field"><label>구매처</label><select id="f_wholesaler"><option value="">선택 안함</option></select></div>
-    <div class="field"><label>사진 (최대 3장)</label><div class="photo-row" id="photoRow"></div>
+    <div class="field"><label>사진 (최대 2장)</label><div class="photo-row" id="photoRow"></div>
       <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)"></div>
     <div class="field"><label>메모</label><textarea id="f_memo" placeholder="선택 입력"></textarea></div>
     <div class="opt-total-box" id="itemOptTotal"></div>
@@ -417,7 +418,7 @@ body{
     </div>
     <div class="opt-total-box" id="wishOptTotal"></div>
     <div class="field"><label>구매처 (선택)</label><select id="wi_wholesaler"><option value="">미지정</option></select></div>
-    <div class="field"><label>사진 (최대 3장)</label><div class="photo-row" id="wishPhotoRow"></div>
+    <div class="field"><label>사진 (최대 2장)</label><div class="photo-row" id="wishPhotoRow"></div>
       <input type="file" id="wishPhotoInput" accept="image/*" style="display:none" onchange="handleWishPhotoUpload(event)"></div>
     <div class="field"><label>메모</label><textarea id="wi_memo" placeholder="선택 입력"></textarea></div>
     <div class="modal-actions">
@@ -519,6 +520,14 @@ body{
 </div>
 
 <!-- ============ MODAL: 건물 추가 ============ -->
+<!-- ============ MODAL: 위시에서 불러오기 ============ -->
+<div class="modal-overlay" id="wishPickerModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2>위시에서 불러오기</h2><button class="modal-close" onclick="closeModal('wishPickerModal')">✕</button></div>
+    <div id="wishPickerList"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="buildingModal">
   <div class="modal-sheet">
     <div class="modal-head"><h2>건물 추가</h2><button class="modal-close" onclick="closeModal('buildingModal')">✕</button></div>
@@ -770,7 +779,7 @@ function wholesalerOptionsHtml(selected){
 }
 function openItemModal(prefill){
   ui.editingItemId = null; ui.formMajor = null; ui.formMinor = null;
-  ui.formPhotos = prefill?.photos ? prefill.photos.slice(0,3) : (prefill?.photo ? [prefill.photo] : []);
+  ui.formPhotos = prefill?.photos ? prefill.photos.slice(0,2) : (prefill?.photo ? [prefill.photo] : []);
   document.getElementById('itemModalTitle').textContent = '상품 등록';
   document.getElementById('itemDeleteBtn').style.display = 'none';
   document.getElementById('f_name').value = prefill?.name || '';
@@ -806,7 +815,7 @@ function openItemEdit(id){
 function renderPhotoRow(){
   const wrap = document.getElementById('photoRow');
   let html = ui.formPhotos.map((p,idx)=>`<div class="photo-slot"><img src="${p}"><button class="ed" onclick="editPhoto(${idx}, event)">✏</button><button class="rm" onclick="removePhoto(${idx}, event)">✕</button></div>`).join('');
-  if(ui.formPhotos.length < 3) html += `<div class="photo-slot" onclick="document.getElementById('photoInput').click()">＋</div>`;
+  if(ui.formPhotos.length < 2) html += `<div class="photo-slot" onclick="document.getElementById('photoInput').click()">＋</div>`;
   wrap.innerHTML = html;
 }
 function removePhoto(idx, e){ e.stopPropagation(); ui.formPhotos.splice(idx,1); renderPhotoRow(); }
@@ -817,7 +826,7 @@ function editPhoto(idx, e){
 function handlePhotoUpload(e){
   const file = e.target.files[0]; if(!file) return;
   readFileAsDataURL(file, (rawUrl)=>{
-    openCropper(rawUrl, (cropped)=>{ if(ui.formPhotos.length < 3) ui.formPhotos.push(cropped); renderPhotoRow(); });
+    openCropper(rawUrl, (cropped)=>{ if(ui.formPhotos.length < 2) ui.formPhotos.push(cropped); renderPhotoRow(); });
   });
   e.target.value = '';
 }
@@ -1184,14 +1193,14 @@ function openWishEdit(id){
 function renderWishPhotoRow(){
   const wrap = document.getElementById('wishPhotoRow');
   let html = ui.formWishPhotos.map((p,idx)=>`<div class="photo-slot"><img src="${p}"><button class="ed" onclick="editWishPhoto(${idx}, event)">✏</button><button class="rm" onclick="removeWishPhoto(${idx}, event)">✕</button></div>`).join('');
-  if(ui.formWishPhotos.length < 3) html += `<div class="photo-slot" onclick="document.getElementById('wishPhotoInput').click()">＋</div>`;
+  if(ui.formWishPhotos.length < 2) html += `<div class="photo-slot" onclick="document.getElementById('wishPhotoInput').click()">＋</div>`;
   wrap.innerHTML = html;
 }
 function removeWishPhoto(idx, e){ e.stopPropagation(); ui.formWishPhotos.splice(idx,1); renderWishPhotoRow(); }
 function editWishPhoto(idx, e){ e.stopPropagation(); openCropper(ui.formWishPhotos[idx], (cropped)=>{ ui.formWishPhotos[idx] = cropped; renderWishPhotoRow(); }); }
 function handleWishPhotoUpload(e){
   const file = e.target.files[0]; if(!file) return;
-  readFileAsDataURL(file, (rawUrl)=>{ openCropper(rawUrl, (cropped)=>{ if(ui.formWishPhotos.length < 3) ui.formWishPhotos.push(cropped); renderWishPhotoRow(); }); });
+  readFileAsDataURL(file, (rawUrl)=>{ openCropper(rawUrl, (cropped)=>{ if(ui.formWishPhotos.length < 2) ui.formWishPhotos.push(cropped); renderWishPhotoRow(); }); });
   e.target.value = '';
 }
 function saveWish(){
@@ -1600,6 +1609,35 @@ function renderQuoteWholesalerOptions(){
   const sel = document.getElementById('qWholesaler');
   sel.innerHTML = '<option value="">미지정</option>' + state.wholesalers.map(w=>`<option value="${escapeHtml(w.name)}">${escapeHtml(w.name)}</option>`).join('');
 }
+function openWishPicker(){
+  const wrap = document.getElementById('wishPickerList');
+  if(!state.wishes.length){
+    wrap.innerHTML = `<div class="empty-state"><div class="emoji">⭐</div><p>불러올 위시가 없어요</p></div>`;
+  } else {
+    const list = state.wishes.slice().sort((a,b)=> (b.createdAt||0)-(a.createdAt||0));
+    wrap.innerHTML = list.map(w=>{
+      const totalQty = optionsTotalQty(w.options);
+      const optSummary = optionsSummary(w.options);
+      return `<div class="wl-card" onclick="pickWishForQuote('${w.id}')">
+        <div class="wl-text">
+          <div class="wl-name">${escapeHtml(w.name)}</div>
+          <div class="wl-loc">${escapeHtml(w.wholesaler||'구매처 미지정')}${optSummary? ' · '+escapeHtml(optSummary):''}</div>
+        </div>
+        <div class="item-price" style="margin-left:auto;">${fmtMoney(w.price)}</div>
+      </div>`;
+    }).join('');
+  }
+  openModal('wishPickerModal');
+}
+function pickWishForQuote(id){
+  const w = state.wishes.find(x=>x.id===id); if(!w) return;
+  closeModal('wishPickerModal');
+  document.getElementById('qName').value = w.name || '';
+  document.getElementById('qPrice').value = w.price || '';
+  document.getElementById('qWholesaler').innerHTML = wholesalerOptionsHtml(w.wholesaler || '');
+  resetOptRows('quote', w.options);
+  showToast('위시 내용을 불러왔어요. 확인 후 담아주세요');
+}
 function addQuoteItem(){
   const name = document.getElementById('qName').value.trim();
   const price = Number(document.getElementById('qPrice').value)||0;
@@ -1659,11 +1697,12 @@ function saveSettingsAndPush(){
   if(state.settings.binId && state.settings.apiKey) pushToCloud(true);
   closeModal('settingsModal');
 }
+function stripPhotos(arr){ return (arr||[]).map(({photos, ...rest})=> rest); }
 async function pushToCloud(silent){
   if(!state.settings.binId || !state.settings.apiKey) return;
   state.settings.dirty = true; saveLocal();
   try{
-    const payload = { items: state.items, wholesalers: state.wholesalers, buildings: state.buildings, quotes: state.quotes, orders: state.orders, wishes: state.wishes, saips: state.saips };
+    const payload = { items: stripPhotos(state.items), wholesalers: state.wholesalers, buildings: state.buildings, quotes: state.quotes, orders: state.orders, wishes: stripPhotos(state.wishes), saips: state.saips };
     const body = JSON.stringify(payload);
     const res = await fetch('https://api.jsonbin.io/v3/b/'+state.settings.binId, {
       method:'PUT', headers:{ 'Content-Type':'application/json', 'X-Master-Key': state.settings.apiKey }, body
@@ -1686,9 +1725,14 @@ async function pullFromCloud(manual){
     const res = await fetch('https://api.jsonbin.io/v3/b/'+binId+'/latest', { headers: key ? { 'X-Master-Key': key } : {} });
     if(res.ok){
       const json = await res.json(); const rec = json.record || {};
-      state.items = rec.items || []; state.wholesalers = rec.wholesalers || [];
+      const localItemPhotos = {}; state.items.forEach(it=>{ if(it.photos && it.photos.length) localItemPhotos[it.id] = it.photos; });
+      const localWishPhotos = {}; state.wishes.forEach(w=>{ if(w.photos && w.photos.length) localWishPhotos[w.id] = w.photos; });
+      state.items = (rec.items||[]).map(it=> ({ ...it, photos: localItemPhotos[it.id] || [] }));
+      state.wholesalers = rec.wholesalers || [];
       state.buildings = rec.buildings && rec.buildings.length ? rec.buildings : ["디오트"];
-      state.quotes = rec.quotes || []; state.orders = rec.orders || []; state.wishes = rec.wishes || []; state.saips = rec.saips || [];
+      state.quotes = rec.quotes || []; state.orders = rec.orders || [];
+      state.wishes = (rec.wishes||[]).map(w=> ({ ...w, photos: localWishPhotos[w.id] || [] }));
+      state.saips = rec.saips || [];
       state.settings.binId = binId; state.settings.apiKey = key; state.settings.lastSync = Date.now(); state.settings.dirty = false;
       saveLocal();
       renderItemCatFilter(); renderBuildingFilter(); renderOrderStatusFilter();
@@ -1702,4 +1746,4 @@ async function pullFromCloud(manual){
 window.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
-</html>
+</h

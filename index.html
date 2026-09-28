@@ -285,19 +285,7 @@ body{
 
   <!-- TAB 3: 견적 계산기 -->
   <div class="tab-panel" id="panel-3">
-    <div class="quote-form">
-      <button class="btn btn-outline" style="width:100%; margin-bottom:12px;" onclick="openWishPicker()">⭐ 위시에서 불러오기</button>
-      <div class="field" style="margin-bottom:8px;"><label>상품명</label><input type="text" id="qName" placeholder="예: 니트 원피스"></div>
-      <div class="field" style="margin-bottom:8px;"><label>단가</label><input type="number" id="qPrice" placeholder="0" oninput="refreshOptTotals('quote')"></div>
-      <div class="field" style="margin-bottom:8px;">
-        <label>색상 / 사이즈 / 수량</label>
-        <div id="quoteOptRows"></div>
-        <button class="btn btn-outline" style="width:100%;" onclick="addOptRow('quote')">+ 옵션 추가</button>
-      </div>
-      <div class="field" style="margin-top:8px; margin-bottom:0;"><label>구매처 (선택)</label><select id="qWholesaler"><option value="">미지정</option></select></div>
-      <div class="opt-total-box" id="quoteOptTotal"></div>
-      <button class="btn btn-primary" style="width:100%; margin-top:12px;" onclick="addQuoteItem()">+ 후보에 담기</button>
-    </div>
+    <button class="btn btn-primary" style="width:100%; margin:10px 0 14px;" onclick="openQuoteModal()">+ 후보 상품 추가</button>
     <div id="quoteTotalBarSlot"></div>
     <div id="quoteList"></div>
     <div id="quoteEmpty" class="empty-state" style="display:none;"><div class="emoji">🧮</div><p>구매 전 후보 상품을 담아보세요</p><p>구매처별로 합계가 자동 계산돼요</p></div>
@@ -520,6 +508,26 @@ body{
 </div>
 
 <!-- ============ MODAL: 건물 추가 ============ -->
+<!-- ============ MODAL: 견적 후보 추가 ============ -->
+<div class="modal-overlay" id="quoteModal">
+  <div class="modal-sheet">
+    <div class="modal-head"><h2>후보 상품 추가</h2><button class="modal-close" onclick="closeModal('quoteModal')">✕</button></div>
+    <button class="btn btn-outline" style="width:100%; margin-bottom:14px;" onclick="openWishPicker()">⭐ 위시에서 불러오기</button>
+    <div class="field"><label>상품명</label><input type="text" id="qName" placeholder="예: 니트 원피스"></div>
+    <div class="field"><label>단가</label><input type="number" id="qPrice" placeholder="0" oninput="refreshOptTotals('quote')"></div>
+    <div class="field">
+      <label>색상 / 사이즈 / 수량</label>
+      <div id="quoteOptRows"></div>
+      <button class="btn btn-outline" style="width:100%;" onclick="addOptRow('quote')">+ 옵션 추가</button>
+    </div>
+    <div class="field"><label>구매처 (선택)</label><select id="qWholesaler"><option value="">미지정</option></select></div>
+    <div class="opt-total-box" id="quoteOptTotal"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="addQuoteItem()">+ 후보에 담기</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ MODAL: 위시에서 불러오기 ============ -->
 <div class="modal-overlay" id="wishPickerModal">
   <div class="modal-sheet">
@@ -699,16 +707,21 @@ function switchTab(n){
   document.getElementById('panel-'+n).classList.add('active');
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
   document.querySelector('.tab-btn[data-tab="'+n+'"]').classList.add('active');
-  document.getElementById('fabBtn').style.display = (n===3) ? 'none' : 'flex';
+  document.getElementById('fabBtn').style.display = 'flex';
   setAccent(n);
 }
 function setAccent(n){
   document.body.style.setProperty('--accent', TAB_ACCENT[n] || TAB_ACCENT[1]);
   document.body.style.setProperty('--modal-bg', TAB_LIGHT[n] || TAB_LIGHT[1]);
 }
+function openQuoteModal(){
+  refreshOptTotals('quote');
+  openModal('quoteModal');
+}
 function handleFab(){
   if(ui.currentTab === 1) openItemModal();
   else if(ui.currentTab === 2) openOrderModal();
+  else if(ui.currentTab === 3) openQuoteModal();
   else if(ui.currentTab === 4) openWishModal();
   else if(ui.currentTab === 5) openSaipModal();
   else if(ui.currentTab === 6) openWholesalerModal();
@@ -1649,6 +1662,7 @@ function addQuoteItem(){
   document.getElementById('qName').value=''; document.getElementById('qPrice').value=''; document.getElementById('qWholesaler').value='';
   resetOptRows('quote', null);
   renderQuotes(); pushToCloud();
+  closeModal('quoteModal'); showToast('후보에 담았어요');
 }
 function removeQuoteItem(id){ state.quotes = state.quotes.filter(q=>q.id!==id); saveLocal(); renderQuotes(); pushToCloud(); }
 function renderQuotes(){
@@ -1746,4 +1760,4 @@ async function pullFromCloud(manual){
 window.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
-</h
+</html>

@@ -338,7 +338,7 @@ body{
       <button class="btn btn-outline" style="width:100%;" onclick="addOptRow('item')">+ 옵션 추가</button>
     </div>
     <div class="field"><label>혼용률</label><input type="text" id="f_mix" placeholder="예: 폴리 80% 스판 20%"></div>
-    <div class="field"><label>구매처</label><select id="f_wholesaler"><option value="">선택 안함</option></select></div>
+    <div class="field"><label>구매처</label><input type="text" id="f_wholesaler" list="wholesalerList" placeholder="구매처 선택 또는 직접 입력"></div>
     <div class="field"><label>사진 (최대 2장)</label><div class="photo-row" id="photoRow"></div>
       <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)"></div>
     <div class="field"><label>메모</label><textarea id="f_memo" placeholder="선택 입력"></textarea></div>
@@ -375,7 +375,7 @@ body{
       <button class="btn btn-outline" style="width:100%;" onclick="addOptRow('order')">+ 옵션 추가</button>
     </div>
     <div class="opt-total-box" id="orderOptTotal"></div>
-    <div class="field"><label>구매처</label><select id="o_wholesaler"><option value="">선택 안함</option></select></div>
+    <div class="field"><label>구매처</label><input type="text" id="o_wholesaler" list="wholesalerList" placeholder="구매처 선택 또는 직접 입력"></div>
     <div class="field">
       <label>입고 상태</label>
       <div class="select-chip-group">
@@ -405,7 +405,7 @@ body{
       <button class="btn btn-outline" style="width:100%;" onclick="addOptRow('wish')">+ 옵션 추가</button>
     </div>
     <div class="opt-total-box" id="wishOptTotal"></div>
-    <div class="field"><label>구매처 (선택)</label><select id="wi_wholesaler"><option value="">미지정</option></select></div>
+    <div class="field"><label>구매처 (선택)</label><input type="text" id="wi_wholesaler" list="wholesalerList" placeholder="구매처 선택 또는 직접 입력"></div>
     <div class="field"><label>사진 (최대 2장)</label><div class="photo-row" id="wishPhotoRow"></div>
       <input type="file" id="wishPhotoInput" accept="image/*" style="display:none" onchange="handleWishPhotoUpload(event)"></div>
     <div class="field"><label>메모</label><textarea id="wi_memo" placeholder="선택 입력"></textarea></div>
@@ -520,7 +520,7 @@ body{
       <div id="quoteOptRows"></div>
       <button class="btn btn-outline" style="width:100%;" onclick="addOptRow('quote')">+ 옵션 추가</button>
     </div>
-    <div class="field"><label>구매처 (선택)</label><select id="qWholesaler"><option value="">미지정</option></select></div>
+    <div class="field"><label>구매처 (선택)</label><input type="text" id="qWholesaler" list="wholesalerList" placeholder="구매처 선택 또는 직접 입력"></div>
     <div class="opt-total-box" id="quoteOptTotal"></div>
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="addQuoteItem()">+ 후보에 담기</button>
@@ -575,6 +575,7 @@ body{
   </div>
 </div>
 
+<datalist id="wholesalerList"></datalist>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -679,7 +680,7 @@ async function init(){
   renderWishCatFilter();
   renderItems();
   renderWholesalers();
-  renderQuoteWholesalerOptions();
+  renderWholesalerDatalist();
   resetOptRows('quote', null);
   renderQuotes();
   renderOrders();
@@ -801,7 +802,7 @@ function openItemModal(prefill){
   document.getElementById('f_memo').value = '';
   document.getElementById('f_date').value = new Date().toISOString().slice(0,10);
   buildMajorCatChips(); renderMinorChips();
-  document.getElementById('f_wholesaler').innerHTML = wholesalerOptionsHtml(prefill?.wholesaler || '');
+  document.getElementById('f_wholesaler').value = prefill?.wholesaler || '';
   resetOptRows('item', prefill?.options);
   renderPhotoRow();
   openModal('itemModal');
@@ -820,7 +821,7 @@ function openItemEdit(id){
   document.querySelectorAll('#majorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.major === it.category));
   renderMinorChips();
   document.querySelectorAll('#minorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.minor === it.subcategory));
-  document.getElementById('f_wholesaler').innerHTML = wholesalerOptionsHtml(it.wholesaler || '');
+  document.getElementById('f_wholesaler').value = it.wholesaler || '';
   resetOptRows('item', it.options);
   renderPhotoRow();
   openModal('itemModal');
@@ -994,14 +995,14 @@ function saveItem(){
     price: Number(document.getElementById('f_price').value)||0,
     options,
     mixRatio: document.getElementById('f_mix').value.trim(),
-    wholesaler: document.getElementById('f_wholesaler').value,
+    wholesaler: (window.__wRes = ensureWholesaler(document.getElementById('f_wholesaler').value)).name,
     purchaseDate: document.getElementById('f_date').value,
     memo: document.getElementById('f_memo').value.trim(),
     photos: ui.formPhotos.slice()
   };
   if(ui.editingItemId){ const idx = state.items.findIndex(i=>i.id===ui.editingItemId); state.items[idx] = Object.assign(state.items[idx], data); }
   else { data.id = crypto.randomUUID(); state.items.push(data); }
-  saveLocal(); renderItems(); closeModal('itemModal'); showToast('저장했어요'); pushToCloud();
+  saveLocal(); renderItems(); closeModal('itemModal'); showToast(window.__wRes.isNew ? `저장했어요 (구매처 '${window.__wRes.name}' 자동등록)` : '저장했어요'); pushToCloud();
 }
 function deleteCurrentItem(){
   if(!ui.editingItemId) return;
@@ -1085,7 +1086,7 @@ function openOrderModal(prefill){
   document.getElementById('o_name').value = prefill?.name || '';
   document.getElementById('o_price').value = prefill?.price || '';
   document.getElementById('o_backorderDate').value = '';
-  document.getElementById('o_wholesaler').innerHTML = wholesalerOptionsHtml(prefill?.wholesaler || '');
+  document.getElementById('o_wholesaler').value = prefill?.wholesaler || '';
   resetOptRows('order', prefill?.options);
   setOrderStatus(false);
   openModal('orderModal');
@@ -1099,7 +1100,7 @@ function openOrderEdit(id){
   document.getElementById('o_name').value = o.name || '';
   document.getElementById('o_price').value = o.price || '';
   document.getElementById('o_backorderDate').value = o.backorderDate || '';
-  document.getElementById('o_wholesaler').innerHTML = wholesalerOptionsHtml(o.wholesaler || '');
+  document.getElementById('o_wholesaler').value = o.wholesaler || '';
   resetOptRows('order', o.options);
   setOrderStatus(o.backorder);
   openModal('orderModal');
@@ -1111,12 +1112,12 @@ function saveOrder(){
   const data = {
     orderDate: document.getElementById('o_date').value,
     name, options, price: Number(document.getElementById('o_price').value)||0,
-    wholesaler: document.getElementById('o_wholesaler').value, backorder: ui.formOrderBack,
+    wholesaler: (window.__wRes = ensureWholesaler(document.getElementById('o_wholesaler').value)).name, backorder: ui.formOrderBack,
     backorderDate: ui.formOrderBack ? document.getElementById('o_backorderDate').value : ''
   };
   if(ui.editingOrderId){ const idx = state.orders.findIndex(o=>o.id===ui.editingOrderId); state.orders[idx] = Object.assign(state.orders[idx], data); }
   else { data.id = crypto.randomUUID(); state.orders.push(data); }
-  saveLocal(); renderOrders(); closeModal('orderModal'); showToast('저장했어요'); pushToCloud();
+  saveLocal(); renderOrders(); closeModal('orderModal'); showToast(window.__wRes.isNew ? `저장했어요 (구매처 '${window.__wRes.name}' 자동등록)` : '저장했어요'); pushToCloud();
 }
 function deleteCurrentOrder(){
   if(!ui.editingOrderId) return;
@@ -1179,7 +1180,7 @@ function openWishModal(){
   document.getElementById('wi_name').value = '';
   document.getElementById('wi_price').value = '';
   document.getElementById('wi_memo').value = '';
-  document.getElementById('wi_wholesaler').innerHTML = wholesalerOptionsHtml('').replace('선택 안함','미지정');
+  document.getElementById('wi_wholesaler').value = '';
   buildWishMajorChips(); renderWishMinorChips();
   resetOptRows('wish', null);
   renderWishPhotoRow();
@@ -1194,7 +1195,7 @@ function openWishEdit(id){
   document.getElementById('wi_name').value = w.name || '';
   document.getElementById('wi_price').value = w.price || '';
   document.getElementById('wi_memo').value = w.memo || '';
-  document.getElementById('wi_wholesaler').innerHTML = wholesalerOptionsHtml(w.wholesaler || '').replace('선택 안함','미지정');
+  document.getElementById('wi_wholesaler').value = w.wholesaler || '';
   buildWishMajorChips();
   document.querySelectorAll('#wishMajorCatGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.major === w.category));
   renderWishMinorChips();
@@ -1224,13 +1225,13 @@ function saveWish(){
     category: ui.wishFormMajor || '', subcategory: ui.wishFormMinor || '',
     name, price: Number(document.getElementById('wi_price').value)||0,
     options,
-    wholesaler: document.getElementById('wi_wholesaler').value,
+    wholesaler: (window.__wRes = ensureWholesaler(document.getElementById('wi_wholesaler').value)).name,
     memo: document.getElementById('wi_memo').value.trim(),
     photos: ui.formWishPhotos.slice()
   };
   if(ui.editingWishId){ const idx = state.wishes.findIndex(w=>w.id===ui.editingWishId); state.wishes[idx] = Object.assign(state.wishes[idx], data); }
   else { data.id = crypto.randomUUID(); data.createdAt = Date.now(); state.wishes.push(data); }
-  saveLocal(); renderWishes(); closeModal('wishModal'); showToast('저장했어요'); pushToCloud();
+  saveLocal(); renderWishes(); closeModal('wishModal'); showToast(window.__wRes.isNew ? `저장했어요 (구매처 '${window.__wRes.name}' 자동등록)` : '저장했어요'); pushToCloud();
 }
 function deleteCurrentWish(){
   if(!ui.editingWishId) return;
@@ -1528,7 +1529,7 @@ function buildingColor(name){
 }
 function renderWholesalers(){
   const q = document.getElementById('wlSearch').value.trim().toLowerCase();
-  let list = state.wholesalers.slice().sort((a,b)=> (a.name||'').localeCompare(b.name||''));
+  let list = state.wholesalers.slice().sort((a,b)=> (a.name||'').localeCompare(b.name||'', 'ko'));
   if(ui.buildingFilter !== '전체') list = list.filter(w=> w.building === ui.buildingFilter);
   if(q) list = list.filter(w=> (w.name||'').toLowerCase().includes(q) || (w.building||'').toLowerCase().includes(q));
   const wrap = document.getElementById('wlList');
@@ -1589,13 +1590,13 @@ function saveWholesaler(){
   };
   if(ui.editingWlId){ const idx = state.wholesalers.findIndex(w=>w.id===ui.editingWlId); state.wholesalers[idx] = Object.assign(state.wholesalers[idx], data); }
   else { data.id = crypto.randomUUID(); state.wholesalers.push(data); }
-  saveLocal(); renderWholesalers(); renderQuoteWholesalerOptions(); closeModal('wlModal'); showToast('저장했어요'); pushToCloud();
+  saveLocal(); renderWholesalers(); renderWholesalerDatalist(); closeModal('wlModal'); showToast('저장했어요'); pushToCloud();
 }
 function deleteCurrentWholesaler(){
   if(!ui.editingWlId) return;
   if(!confirm('이 구매처를 삭제할까요?')) return;
   state.wholesalers = state.wholesalers.filter(w=>w.id!==ui.editingWlId);
-  saveLocal(); renderWholesalers(); renderQuoteWholesalerOptions(); closeModal('wlModal'); showToast('삭제했어요'); pushToCloud();
+  saveLocal(); renderWholesalers(); renderWholesalerDatalist(); closeModal('wlModal'); showToast('삭제했어요'); pushToCloud();
 }
 function openWlDetail(id){
   const w = state.wholesalers.find(x=>x.id===id); if(!w) return;
@@ -1618,9 +1619,23 @@ function editCurrentWholesaler(){ closeModal('wlDetailModal'); openWlEdit(ui.vie
 function copyAccount(acc){ navigator.clipboard.writeText(acc).then(()=>showToast('계좌번호를 복사했어요')); }
 
 /* ============ TAB3: 견적 계산기 ============ */
-function renderQuoteWholesalerOptions(){
-  const sel = document.getElementById('qWholesaler');
-  sel.innerHTML = '<option value="">미지정</option>' + state.wholesalers.map(w=>`<option value="${escapeHtml(w.name)}">${escapeHtml(w.name)}</option>`).join('');
+function renderWholesalerDatalist(){
+  const dl = document.getElementById('wholesalerList');
+  if(!dl) return;
+  const names = state.wholesalers.slice().sort((a,b)=> (a.name||'').localeCompare(b.name||'', 'ko'));
+  dl.innerHTML = names.map(w=>`<option value="${escapeHtml(w.name)}"></option>`).join('');
+}
+function ensureWholesaler(rawName){
+  const name = (rawName||'').trim();
+  if(!name) return { name:'', isNew:false };
+  const exists = state.wholesalers.some(w=> w.name === name);
+  if(!exists){
+    state.wholesalers.push({ id: crypto.randomUUID(), name, building:'', floor:'', unit:'', payment:[], account:'', memo:'' });
+    saveLocal();
+    renderWholesalers();
+    renderWholesalerDatalist();
+  }
+  return { name, isNew: !exists };
 }
 function openWishPicker(){
   const wrap = document.getElementById('wishPickerList');
@@ -1647,22 +1662,22 @@ function pickWishForQuote(id){
   closeModal('wishPickerModal');
   document.getElementById('qName').value = w.name || '';
   document.getElementById('qPrice').value = w.price || '';
-  document.getElementById('qWholesaler').innerHTML = wholesalerOptionsHtml(w.wholesaler || '');
+  document.getElementById('qWholesaler').value = w.wholesaler || '';
   resetOptRows('quote', w.options);
   showToast('위시 내용을 불러왔어요. 확인 후 담아주세요');
 }
 function addQuoteItem(){
   const name = document.getElementById('qName').value.trim();
   const price = Number(document.getElementById('qPrice').value)||0;
-  const wholesaler = document.getElementById('qWholesaler').value;
+  const wRes = ensureWholesaler(document.getElementById('qWholesaler').value);
   if(!name){ showToast('상품명을 입력해주세요'); return; }
   const options = ui.optRows.quote.map(r=>({ color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||0 }));
-  state.quotes.push({ id: crypto.randomUUID(), name, price, options, wholesaler });
+  state.quotes.push({ id: crypto.randomUUID(), name, price, options, wholesaler: wRes.name });
   saveLocal();
   document.getElementById('qName').value=''; document.getElementById('qPrice').value=''; document.getElementById('qWholesaler').value='';
   resetOptRows('quote', null);
   renderQuotes(); pushToCloud();
-  closeModal('quoteModal'); showToast('후보에 담았어요');
+  closeModal('quoteModal'); showToast(wRes.isNew ? `담았어요 (구매처 '${wRes.name}' 자동등록)` : '후보에 담았어요');
 }
 function removeQuoteItem(id){ state.quotes = state.quotes.filter(q=>q.id!==id); saveLocal(); renderQuotes(); pushToCloud(); }
 function renderQuotes(){
@@ -1740,24 +1755,4 @@ async function pullFromCloud(manual){
     if(res.ok){
       const json = await res.json(); const rec = json.record || {};
       const localItemPhotos = {}; state.items.forEach(it=>{ if(it.photos && it.photos.length) localItemPhotos[it.id] = it.photos; });
-      const localWishPhotos = {}; state.wishes.forEach(w=>{ if(w.photos && w.photos.length) localWishPhotos[w.id] = w.photos; });
-      state.items = (rec.items||[]).map(it=> ({ ...it, photos: localItemPhotos[it.id] || [] }));
-      state.wholesalers = rec.wholesalers || [];
-      state.buildings = rec.buildings && rec.buildings.length ? rec.buildings : ["디오트"];
-      state.quotes = rec.quotes || []; state.orders = rec.orders || [];
-      state.wishes = (rec.wishes||[]).map(w=> ({ ...w, photos: localWishPhotos[w.id] || [] }));
-      state.saips = rec.saips || [];
-      state.settings.binId = binId; state.settings.apiKey = key; state.settings.lastSync = Date.now(); state.settings.dirty = false;
-      saveLocal();
-      renderItemCatFilter(); renderBuildingFilter(); renderOrderStatusFilter();
-      renderItems(); renderWholesalers(); renderQuoteWholesalerOptions(); renderQuotes();
-      renderOrders(); renderWishes(); renderSaips(); updateSyncInfo();
-      if(manual) showToast('클라우드에서 가져왔어요');
-    } else { if(manual) showToast('가져오기 실패 (Bin ID/Key 확인)'); }
-  }catch(e){ if(manual) showToast('네트워크 오류'); }
-}
-
-window.addEventListener('DOMContentLoaded', init);
-</script>
-</body>
-</html>
+      const localWishPhotos = {}; st

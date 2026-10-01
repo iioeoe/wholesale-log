@@ -1755,4 +1755,24 @@ async function pullFromCloud(manual){
     if(res.ok){
       const json = await res.json(); const rec = json.record || {};
       const localItemPhotos = {}; state.items.forEach(it=>{ if(it.photos && it.photos.length) localItemPhotos[it.id] = it.photos; });
-      const localWishPhotos = {}; st
+      const localWishPhotos = {}; state.wishes.forEach(w=>{ if(w.photos && w.photos.length) localWishPhotos[w.id] = w.photos; });
+      state.items = (rec.items||[]).map(it=> ({ ...it, photos: localItemPhotos[it.id] || [] }));
+      state.wholesalers = rec.wholesalers || [];
+      state.buildings = rec.buildings && rec.buildings.length ? rec.buildings : ["디오트"];
+      state.quotes = rec.quotes || []; state.orders = rec.orders || [];
+      state.wishes = (rec.wishes||[]).map(w=> ({ ...w, photos: localWishPhotos[w.id] || [] }));
+      state.saips = rec.saips || [];
+      state.settings.binId = binId; state.settings.apiKey = key; state.settings.lastSync = Date.now(); state.settings.dirty = false;
+      saveLocal();
+      renderItemCatFilter(); renderBuildingFilter(); renderOrderStatusFilter();
+      renderItems(); renderWholesalers(); renderWholesalerDatalist(); renderQuotes();
+      renderOrders(); renderWishes(); renderSaips(); updateSyncInfo();
+      if(manual) showToast('클라우드에서 가져왔어요');
+    } else { if(manual) showToast('가져오기 실패 (Bin ID/Key 확인)'); }
+  }catch(e){ if(manual) showToast('네트워크 오류'); }
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

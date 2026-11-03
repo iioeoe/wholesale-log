@@ -476,14 +476,15 @@ body{
     <div class="field"><label>상호명</label><input type="text" id="w_name" placeholder="예: 스터닝"></div>
     <div class="field"><label>건물</label><select id="w_building"></select></div>
     <div class="field-row">
-      <div class="field"><label>층</label><input type="text" id="w_floor" placeholder="예: 지하1층"></div>
+      <div class="field"><label>층</label><input type="text" id="w_floor" placeholder="예: 지하1 (층 자동)"></div>
       <div class="field"><label>호</label><input type="text" id="w_unit" placeholder="예: D14" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
     <div class="field"><label>결제방법</label>
       <div class="select-chip-group" id="paymentGroup">
-        <div class="select-chip" data-pay="현금" onclick="togglePayment(this)">현금</div>
-        <div class="select-chip" data-pay="카드" onclick="togglePayment(this)">카드</div>
         <div class="select-chip" data-pay="계좌이체" onclick="togglePayment(this)">계좌이체</div>
+        <div class="select-chip" data-pay="대납" onclick="togglePayment(this)">대납</div>
+        <div class="select-chip" data-pay="현금(me)" onclick="togglePayment(this)">현금(me)</div>
+        <div class="select-chip" data-pay="카드" onclick="togglePayment(this)">카드</div>
       </div>
     </div>
     <div class="field"><label>계좌번호</label><input type="text" id="w_account" placeholder="예: 국민 123456-01-123456"></div>
@@ -650,6 +651,41 @@ const OPT_PRICE_FIELD = { item:'f_price', order:'o_price', quote:'qPrice', wish:
 const OPT_ROWS_CONTAINER = { item:'itemOptRows', order:'orderOptRows', quote:'quoteOptRows', wish:'wishOptRows' };
 const OPT_TOTAL_EL = { item:'itemOptTotal', order:'orderOptTotal', quote:'quoteOptTotal', wish:'wishOptTotal' };
 
+/* ============ 공통 헬퍼 (층 / 결제방법 / 사이즈) ============ */
+const PAY_ORDER = ['계좌이체','대납','현금(me)','카드'];
+function sortPayments(arr){
+  const mapped = (arr||[]).map(p=> p==='현금' ? '현금(me)' : p).filter((p,i,a)=> a.indexOf(p)===i);
+  return mapped.sort((a,b)=>{
+    const ia = PAY_ORDER.indexOf(a), ib = PAY_ORDER.indexOf(b);
+    return (ia<0?99:ia) - (ib<0?99:ib);
+  });
+}
+function normalizeFloor(v){
+  v = (v||'').trim();
+  if(!v) return '';
+  return /\d$/.test(v) ? v + '층' : v;
+}
+function buildOptions(rows){
+  return rows.map(r=>{
+    const color = (r.color||'').trim();
+    let size = (r.size||'').trim();
+    if(!size && (color || rows.length===1)) size = 'FREE';
+    return { color, size, qty: Number(r.qty)||0 };
+  });
+}
+function saipStatusFor(shopName){
+  const w = state.wholesalers.find(x=> x.name === (shopName||'').trim());
+  if(!w) return null;
+  return (w.payment||[]).includes('대납') ? 'daenap' : 'wannap';
+}
+function normalizeData(){
+  (state.wholesalers||[]).forEach(w=>{
+    w.payment = sortPayments(w.payment);
+    w.floor = normalizeFloor(w.floor);
+  });
+  (state.saips||[]).forEach(sp=> (sp.items||[]).forEach(it=>{ it.floor = normalizeFloor(it.floor); }));
+}
+
 /* ============ 저장/로드 (localStorage) ============ */
 function loadLocal(){
   try{
@@ -661,6 +697,7 @@ function loadLocal(){
       if(!state.orders) state.orders = [];
       if(!state.wishes) state.wishes = [];
       if(!state.saips) state.saips = [];
+      normalizeData();
     }
   }catch(e){ console.error(e); }
 }
@@ -989,7 +1026,7 @@ function saveItem(){
   const name = document.getElementById('f_name').value.trim();
   if(!ui.formMajor){ showToast('대분류를 선택해주세요'); return; }
   if(!name){ showToast('상품명을 입력해주세요'); return; }
-  const options = ui.optRows.item.map(r=>({ color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||0 }));
+  const options = buildOptions(ui.optRows.item);
   const data = {
     category: ui.formMajor, subcategory: ui.formMinor || '', name,
     price: Number(document.getElementById('f_price').value)||0,
@@ -1108,7 +1145,7 @@ function openOrderEdit(id){
 function saveOrder(){
   const name = document.getElementById('o_name').value.trim();
   if(!name){ showToast('상품명을 입력해주세요'); return; }
-  const options = ui.optRows.order.map(r=>({ color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||0 }));
+  const options = buildOptions(ui.optRows.order);
   const data = {
     orderDate: document.getElementById('o_date').value,
     name, options, price: Number(document.getElementById('o_price').value)||0,
@@ -1220,7 +1257,7 @@ function handleWishPhotoUpload(e){
 function saveWish(){
   const name = document.getElementById('wi_name').value.trim();
   if(!name){ showToast('상품명을 입력해주세요'); return; }
-  const options = ui.optRows.wish.map(r=>({ color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||0 }));
+  const options = buildOptions(ui.optRows.wish);
   const data = {
     category: ui.wishFormMajor || '', subcategory: ui.wishFormMinor || '',
     name, price: Number(document.getElementById('wi_price').value)||0,
@@ -1300,6 +1337,12 @@ function updateSaipRow(id, field, val){
   const r = ui.formSaipRows.find(x=>x.id===id);
   if(r){ r[field] = val; updateSaipFeePreview(); }
 }
+function applySaipShopDefaults(id, name){
+  const st = saipStatusFor(name);
+  if(!st) return;
+  const r = ui.formSaipRows.find(x=>x.id===id);
+  if(r){ r.status = st; renderSaipRows(); }
+}
 function setSaipRowStatus(id, status){
   const r = ui.formSaipRows.find(x=>x.id===id);
   if(r){ r.status = status; renderSaipRows(); }
@@ -1319,10 +1362,10 @@ function renderSaipRows(){
         <div class="field" style="margin-bottom:0;"><label>사이즈</label><input type="text" value="${escapeHtml(r.size)}" oninput="this.value=this.value.toUpperCase(); updateSaipRow('${r.id}','size',this.value)" placeholder="사이즈"></div>
         <div class="field" style="margin-bottom:0; max-width:70px;"><label>수량</label><input type="number" value="${r.qty||1}" oninput="updateSaipRow('${r.id}','qty',this.value)" placeholder="1"></div>
       </div>
-      <div class="field" style="margin-bottom:8px;"><label>상호명</label><input type="text" value="${escapeHtml(r.shopName)}" oninput="updateSaipRow('${r.id}','shopName',this.value)" placeholder="상호명"></div>
+      <div class="field" style="margin-bottom:8px;"><label>상호명</label><input type="text" value="${escapeHtml(r.shopName)}" oninput="updateSaipRow('${r.id}','shopName',this.value)" onchange="applySaipShopDefaults('${r.id}', this.value)" placeholder="상호명"></div>
       <div class="field-row" style="margin-bottom:8px;">
         <div class="field" style="margin-bottom:0;"><label>건물</label><input type="text" value="${escapeHtml(r.building)}" oninput="updateSaipRow('${r.id}','building',this.value)" placeholder="건물"></div>
-        <div class="field" style="margin-bottom:0;"><label>층</label><input type="text" value="${escapeHtml(r.floor)}" oninput="updateSaipRow('${r.id}','floor',this.value)" placeholder="층"></div>
+        <div class="field" style="margin-bottom:0;"><label>층</label><input type="text" value="${escapeHtml(r.floor)}" oninput="updateSaipRow('${r.id}','floor',this.value)" onchange="this.value=normalizeFloor(this.value); updateSaipRow('${r.id}','floor',this.value)" placeholder="층"></div>
         <div class="field" style="margin-bottom:0;"><label>호</label><input type="text" value="${escapeHtml(r.unit)}" oninput="this.value=this.value.toUpperCase(); updateSaipRow('${r.id}','unit',this.value)" placeholder="호"></div>
       </div>
       <div class="field" style="margin-bottom:0;">
@@ -1381,8 +1424,8 @@ function openSaipEdit(id){
 function saveSaip(){
   if(ui.formSaipRows.every(r=>!r.name.trim())){ showToast('상품을 1개 이상 입력해주세요'); return; }
   const items = ui.formSaipRows.filter(r=>r.name.trim()).map(r=>({
-    name:r.name.trim(), price:Number(r.price)||0, color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||1,
-    shopName:r.shopName.trim(), building:r.building.trim(), floor:r.floor.trim(), unit:r.unit.trim(), status: r.status==='daenap'?'daenap':'wannap'
+    name:r.name.trim(), price:Number(r.price)||0, color:r.color.trim(), size:r.size.trim()||'FREE', qty:Number(r.qty)||1,
+    shopName:r.shopName.trim(), building:r.building.trim(), floor:normalizeFloor(r.floor), unit:r.unit.trim(), status: r.status==='daenap'?'daenap':'wannap'
   }));
   const applyDate = document.getElementById('sp_date').value;
   const type = ui.formSaipType;
@@ -1442,7 +1485,7 @@ function buildSaipCopyText(s){
       });
     });
     lines.push(`총 금액  ${fmtNum(shopTotal)}원`);
-    const loc = [g.building, g.floor, g.unit].filter(Boolean).join(' ');
+    const loc = [g.building, normalizeFloor(g.floor), g.unit].filter(Boolean).join(' ');
     lines.push(`${[loc, g.shopName].filter(Boolean).join(' ')}`);
     if(daenapTotal > 0) lines.push(`>> 대납 \\${fmtNum(daenapTotal)}`);
   });
@@ -1498,8 +1541,8 @@ function convertOrderToSaip(e, orderId){
   const wl = state.wholesalers.find(w=>w.name === o.wholesaler);
   const baseOptions = (o.options && o.options.length) ? o.options : [{color:'',size:'',qty:1}];
   const rows = baseOptions.map(opt=>({
-    id: crypto.randomUUID(), name:o.name, price:o.price, color:opt.color||'', size:opt.size||'', qty:opt.qty||1,
-    shopName:o.wholesaler||'', building: wl?.building||'', floor: wl?.floor||'', unit: wl?.unit||'', status:'wannap'
+    id: crypto.randomUUID(), name:o.name, price:o.price, color:opt.color||'', size:opt.size||'FREE', qty:opt.qty||1,
+    shopName:o.wholesaler||'', building: wl?.building||'', floor: normalizeFloor(wl?.floor), unit: wl?.unit||'', status: saipStatusFor(o.wholesaler) || 'wannap'
   }));
   o.saipLinked = true;
   saveLocal(); renderOrders(); pushToCloud();
@@ -1567,11 +1610,11 @@ function openWholesalerModal(){
 }
 function openWlEdit(id){
   const w = state.wholesalers.find(x=>x.id===id); if(!w) return;
-  ui.editingWlId = id; ui.formPayments = (w.payment||[]).slice();
+  ui.editingWlId = id; ui.formPayments = sortPayments(w.payment);
   document.getElementById('wlModalTitle').textContent = '구매처 수정';
   document.getElementById('wlDeleteBtn').style.display = 'block';
   document.getElementById('w_name').value = w.name||'';
-  document.getElementById('w_floor').value = w.floor||'';
+  document.getElementById('w_floor').value = normalizeFloor(w.floor);
   document.getElementById('w_unit').value = w.unit||'';
   document.getElementById('w_account').value = w.account||'';
   document.getElementById('w_memo').value = w.memo||'';
@@ -1584,8 +1627,8 @@ function saveWholesaler(){
   if(!name){ showToast('상호명을 입력해주세요'); return; }
   const data = {
     name, building: document.getElementById('w_building').value,
-    floor: document.getElementById('w_floor').value.trim(), unit: document.getElementById('w_unit').value.trim(),
-    payment: ui.formPayments.slice(), account: document.getElementById('w_account').value.trim(),
+    floor: normalizeFloor(document.getElementById('w_floor').value), unit: document.getElementById('w_unit').value.trim(),
+    payment: sortPayments(ui.formPayments), account: document.getElementById('w_account').value.trim(),
     memo: document.getElementById('w_memo').value.trim()
   };
   if(ui.editingWlId){ const idx = state.wholesalers.findIndex(w=>w.id===ui.editingWlId); state.wholesalers[idx] = Object.assign(state.wholesalers[idx], data); }
@@ -1601,7 +1644,7 @@ function deleteCurrentWholesaler(){
 function openWlDetail(id){
   const w = state.wholesalers.find(x=>x.id===id); if(!w) return;
   ui.viewingWlId = id;
-  const payHtml = (w.payment&&w.payment.length) ? w.payment.map(p=>`<span class="badge-pay">${p}</span>`).join('') : '<span style="font-size:12.5px;color:#b2b2c2;">등록된 결제방법 없음</span>';
+  const payHtml = (w.payment&&w.payment.length) ? sortPayments(w.payment).map(p=>`<span class="badge-pay">${p}</span>`).join('') : '<span style="font-size:12.5px;color:#b2b2c2;">등록된 결제방법 없음</span>';
   document.getElementById('wlDetailBody').innerHTML = `
     <div style="font-size:20px; font-weight:800; color:var(--navy); margin-bottom:4px;">${escapeHtml(w.name)}</div>
     <div style="font-size:12px; color:var(--gray); margin-bottom:16px;">${escapeHtml(w.building||'-')} ${escapeHtml(w.floor||'')} ${escapeHtml(w.unit||'')}</div>
@@ -1671,7 +1714,7 @@ function addQuoteItem(){
   const price = Number(document.getElementById('qPrice').value)||0;
   const wRes = ensureWholesaler(document.getElementById('qWholesaler').value);
   if(!name){ showToast('상품명을 입력해주세요'); return; }
-  const options = ui.optRows.quote.map(r=>({ color:r.color.trim(), size:r.size.trim(), qty:Number(r.qty)||0 }));
+  const options = buildOptions(ui.optRows.quote);
   state.quotes.push({ id: crypto.randomUUID(), name, price, options, wholesaler: wRes.name });
   saveLocal();
   document.getElementById('qName').value=''; document.getElementById('qPrice').value=''; document.getElementById('qWholesaler').value='';
@@ -1762,6 +1805,7 @@ async function pullFromCloud(manual){
       state.quotes = rec.quotes || []; state.orders = rec.orders || [];
       state.wishes = (rec.wishes||[]).map(w=> ({ ...w, photos: localWishPhotos[w.id] || [] }));
       state.saips = rec.saips || [];
+      normalizeData();
       state.settings.binId = binId; state.settings.apiKey = key; state.settings.lastSync = Date.now(); state.settings.dirty = false;
       saveLocal();
       renderItemCatFilter(); renderBuildingFilter(); renderOrderStatusFilter();

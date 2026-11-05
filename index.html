@@ -135,6 +135,10 @@ body{
 .saip-date{ font-size:13.5px; font-weight:800; color:var(--navy); }
 .saip-badges span{ font-size:10px; font-weight:700; padding:3px 8px; border-radius:999px; margin-left:4px; }
 .b-daenap{ background:#dce8fb; color:#3a5fa8; }
+.b-keep{ background:#fde6b1; color:#a8741a; }
+.stored-card{ display:flex; align-items:center; gap:10px; padding:11px 13px; background:#fff; border:1.5px solid #ecdff0; border-radius:14px; margin-bottom:8px; cursor:pointer; font-size:13px; font-weight:600; color:var(--navy); }
+.stored-card.sel{ border-color:var(--accent); }
+.stored-card .chk{ font-size:17px; flex-shrink:0; }
 .b-wannap{ background:#e2f3ea; color:var(--ok); }
 .b-none{ background:#f3eef4; color:#b3a9b6; }
 .saip-meta{ font-size:11.5px; color:var(--gray); }
@@ -439,11 +443,18 @@ body{
     <div class="field"><label>사입신청일</label><input type="date" id="sp_date"></div>
     <div class="field"><label>유형</label>
       <div class="select-chip-group" id="saipTypeGroup">
-        <div class="select-chip" data-type="픽업" onclick="setSaipType('픽업')">픽업</div>
         <div class="select-chip" data-type="주문" onclick="setSaipType('주문')">주문</div>
-        <div class="select-chip" data-type="주문&픽업" onclick="setSaipType('주문&픽업')">주문&픽업</div>
+        <div class="select-chip" data-type="픽업" onclick="setSaipType('픽업')">픽업</div>
+        <div class="select-chip" data-type="주문+픽업" onclick="setSaipType('주문+픽업')">주문+픽업</div>
       </div>
     </div>
+    <div class="field"><label>발송</label>
+      <div class="select-chip-group" id="saipShipGroup">
+        <div class="select-chip" data-ship="택배" onclick="setSaipShip('택배')">택배</div>
+        <div class="select-chip" data-ship="보관" onclick="setSaipShip('보관')">보관</div>
+      </div>
+    </div>
+    <div class="field" id="saipStoredField" style="display:none;"><label>보관 신청건 함께 보내기</label><div id="saipStoredList"></div></div>
     <div class="field">
       <label>상품 목록 (상품별로 대납/완납 선택)</label>
       <div id="saipRows"></div>
@@ -638,6 +649,8 @@ let ui = {
   formOrderBack: false,
   formSaipRows: [],
   formSaipType: '주문',
+  formSaipShip: '택배',
+  formSaipIncluded: [],
   wishFormMajor: null,
   wishFormMinor: null,
   formWishPhotos: [],
@@ -683,7 +696,10 @@ function normalizeData(){
     w.payment = sortPayments(w.payment);
     w.floor = normalizeFloor(w.floor);
   });
-  (state.saips||[]).forEach(sp=> (sp.items||[]).forEach(it=>{ it.floor = normalizeFloor(it.floor); }));
+  (state.saips||[]).forEach(sp=>{
+    if(sp.type === '주문&픽업') sp.type = '주문+픽업';
+    (sp.items||[]).forEach(it=>{ it.floor = normalizeFloor(it.floor); });
+  });
 }
 
 /* ============ 저장/로드 (localStorage) ============ */
@@ -1378,35 +1394,75 @@ function renderSaipRows(){
     </div>`).join('');
   updateSaipFeePreview();
 }
-function calcSaipFee(rows){
+function calcSaipFee(rows, ship){
   const daenapTotal = rows.filter(r=>r.status==='daenap').reduce((s,r)=> s + (Number(r.price)||0)*(Number(r.qty)||0), 0);
   const wannapTotal = rows.filter(r=>r.status!=='daenap').reduce((s,r)=> s + (Number(r.price)||0)*(Number(r.qty)||0), 0);
   const shopSet = new Set(rows.map(r=> (r.shopName||'').trim()).filter(Boolean));
   const shopCount = shopSet.size;
-  const fee = shopCount * SAIP_FEE_PER_SHOP + (rows.length ? SAIP_SHIPPING_FEE : 0);
-  return { daenapTotal, wannapTotal, itemsGrand: daenapTotal+wannapTotal, shopCount, fee, grandTotal: daenapTotal + fee };
+  const shippingFee = (ship==='보관') ? 0 : (rows.length ? SAIP_SHIPPING_FEE : 0);
+  const fee = shopCount * SAIP_FEE_PER_SHOP + shippingFee;
+  return { daenapTotal, wannapTotal, itemsGrand: daenapTotal+wannapTotal, shopCount, shippingFee, fee, grandTotal: daenapTotal + fee };
 }
-function updateSaipFeePreview(){
-  const r = calcSaipFee(ui.formSaipRows);
-  document.getElementById('saipFeePreview').innerHTML = `
+function saipMMDD(s){ return s.applyDate ? s.applyDate.slice(5,7)+s.applyDate.slice(8,10) : '날짜미지정'; }
+function saipLabel(s){ return `${saipMMDD(s)} · ${s.type||'주문'}`; }
+function saipShopCountOf(items){ return new Set((items||[]).map(it=>(it.shopName||'').trim()).filter(Boolean)).size; }
+function saipFeeBoxInner(r, ship, linked){
+  const linkedRow = (linked && linked.length)
+    ? `<div class="fee-row"><span>함께 보내는 보관건</span><span style="text-align:right;">${linked.map(x=>escapeHtml(saipLabel(x))).join('<br>')}</span></div>` : '';
+  return `
     <div class="fee-row"><span>대납 상품 합계</span><span>${fmtMoney(r.daenapTotal)}</span></div>
     <div class="fee-row"><span>완납 상품 합계 (별도 정산됨)</span><span>${fmtMoney(r.wannapTotal)}</span></div>
     <div class="fee-row"><span>거래처 수수료 (${r.shopCount}곳 × 2,000원)</span><span>${fmtMoney(r.shopCount*SAIP_FEE_PER_SHOP)}</span></div>
-    <div class="fee-row"><span>택배비</span><span>${fmtMoney(ui.formSaipRows.length?SAIP_SHIPPING_FEE:0)}</span></div>
+    <div class="fee-row"><span>택배비${ship==='보관' ? ' (보관)' : ''}</span><span>${fmtMoney(r.shippingFee)}</span></div>
+    ${linkedRow}
     <div class="fee-row total"><span>총 결제금액 (대납분+수수료)</span><span>${fmtMoney(r.grandTotal)}</span></div>`;
+}
+function updateSaipFeePreview(){
+  const ship = ui.formSaipShip;
+  const r = calcSaipFee(ui.formSaipRows, ship);
+  const linked = ship==='택배' ? ui.formSaipIncluded.map(id=> state.saips.find(x=>x.id===id)).filter(Boolean) : [];
+  document.getElementById('saipFeePreview').innerHTML = saipFeeBoxInner(r, ship, linked);
 }
 function setSaipType(type){
   ui.formSaipType = type;
   document.querySelectorAll('#saipTypeGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.type === type));
 }
+function saipStoredCandidates(){
+  const me = ui.editingSaipId;
+  return state.saips
+    .filter(x=> x.ship==='보관' && x.id!==me && (x.storedStatus!=='sent' || x.sentWithId===me))
+    .sort((a,b)=> (a.applyDate||'').localeCompare(b.applyDate||''));
+}
+function renderSaipStored(){
+  const field = document.getElementById('saipStoredField');
+  const wrap = document.getElementById('saipStoredList');
+  const list = ui.formSaipShip==='택배' ? saipStoredCandidates() : [];
+  if(!list.length){ field.style.display = 'none'; wrap.innerHTML = ''; return; }
+  field.style.display = 'block';
+  wrap.innerHTML = list.map(x=>{
+    const sel = ui.formSaipIncluded.includes(x.id);
+    return `<div class="stored-card ${sel?'sel':''}" onclick="toggleSaipStored('${x.id}')"><span class="chk">${sel?'☑':'☐'}</span><span>${escapeHtml(saipLabel(x))} | 거래처 ${saipShopCountOf(x.items)}곳 · 상품 ${(x.items||[]).length}건</span></div>`;
+  }).join('');
+}
+function toggleSaipStored(id){
+  if(ui.formSaipIncluded.includes(id)) ui.formSaipIncluded = ui.formSaipIncluded.filter(x=>x!==id);
+  else ui.formSaipIncluded.push(id);
+  renderSaipStored(); updateSaipFeePreview();
+}
+function setSaipShip(ship){
+  ui.formSaipShip = ship;
+  document.querySelectorAll('#saipShipGroup .select-chip').forEach(el=> el.classList.toggle('sel', el.dataset.ship === ship));
+  renderSaipStored(); updateSaipFeePreview();
+}
 function openSaipModal(prefillRows){
-  ui.editingSaipId = null; ui.formSaipRows = []; ui.formSaipType = '주문';
+  ui.editingSaipId = null; ui.formSaipRows = []; ui.formSaipType = '주문'; ui.formSaipIncluded = [];
   document.getElementById('saipModalTitle').textContent = '사입 신청 등록';
   document.getElementById('saipDeleteBtn').style.display = 'none';
   document.getElementById('sp_date').value = new Date().toISOString().slice(0,10);
   setSaipType('주문');
   if(prefillRows && prefillRows.length){ ui.formSaipRows = prefillRows; renderSaipRows(); }
   else addSaipRow();
+  setSaipShip('택배');
   openModal('saipModal');
 }
 function openSaipEdit(id){
@@ -1414,11 +1470,13 @@ function openSaipEdit(id){
   ui.editingSaipId = id;
   ui.formSaipRows = (s.items||[]).map(it=>Object.assign({id:crypto.randomUUID(), status: it.status || 'wannap'}, it));
   ui.formSaipType = s.type || '주문';
+  ui.formSaipIncluded = state.saips.filter(x=> x.sentWithId===id).map(x=>x.id);
   document.getElementById('saipModalTitle').textContent = '사입 신청 수정';
   document.getElementById('saipDeleteBtn').style.display = 'block';
   document.getElementById('sp_date').value = s.applyDate || '';
   setSaipType(ui.formSaipType);
   if(ui.formSaipRows.length===0) addSaipRow(); else renderSaipRows();
+  setSaipShip(s.ship || '택배');
   openModal('saipModal');
 }
 function saveSaip(){
@@ -1429,24 +1487,42 @@ function saveSaip(){
   }));
   const applyDate = document.getElementById('sp_date').value;
   const type = ui.formSaipType;
+  const ship = ui.formSaipShip;
+  let target;
   if(ui.editingSaipId){
-    const idx = state.saips.findIndex(s=>s.id===ui.editingSaipId);
-    state.saips[idx] = Object.assign(state.saips[idx], { applyDate, type, items });
+    target = state.saips.find(s=>s.id===ui.editingSaipId);
+    Object.assign(target, { applyDate, type, items });
   } else {
     const existing = state.saips.find(s=> s.applyDate === applyDate);
     if(existing){
       existing.items = (existing.items||[]).concat(items);
       existing.type = type;
+      target = existing;
     } else {
-      state.saips.push({ id: crypto.randomUUID(), applyDate, type, items });
+      target = { id: crypto.randomUUID(), applyDate, type, items };
+      state.saips.push(target);
     }
+  }
+  target.ship = ship;
+  // 이 신청건에 묶여 있던 보관건은 일단 해제한 뒤 다시 연결
+  state.saips.forEach(x=>{ if(x.sentWithId === target.id){ x.storedStatus = 'keeping'; x.sentWithId = ''; } });
+  if(ship === '보관'){
+    if(target.storedStatus !== 'sent') target.storedStatus = 'keeping';
+  } else {
+    delete target.storedStatus; delete target.sentWithId;
+    ui.formSaipIncluded.forEach(id=>{
+      const x = state.saips.find(y=>y.id===id);
+      if(x && x.ship==='보관'){ x.storedStatus = 'sent'; x.sentWithId = target.id; }
+    });
   }
   saveLocal(); renderSaips(); closeModal('saipModal'); showToast('저장했어요'); pushToCloud();
 }
 function deleteCurrentSaip(){
   if(!ui.editingSaipId) return;
   if(!confirm('이 사입 신청건을 삭제할까요?')) return;
-  state.saips = state.saips.filter(s=>s.id!==ui.editingSaipId);
+  const delId = ui.editingSaipId;
+  state.saips.forEach(x=>{ if(x.sentWithId === delId){ x.storedStatus = 'keeping'; x.sentWithId = ''; } });
+  state.saips = state.saips.filter(s=>s.id!==delId);
   saveLocal(); renderSaips(); closeModal('saipModal'); showToast('삭제했어요'); pushToCloud();
 }
 function fmtNum(n){ return (Number(n)||0).toLocaleString('ko-KR'); }
@@ -1498,12 +1574,20 @@ function renderSaips(){
   const wrap = document.getElementById('saipList');
   if(list.length===0){ wrap.innerHTML = `<div class="empty-state"><div class="emoji">🧾</div><p>등록된 사입 신청이 없어요</p><p>+ 버튼으로 신청건을 추가해보세요</p></div>`; return; }
   wrap.innerHTML = list.map(s=>{
-    const r = calcSaipFee(s.items||[]);
-    const mmdd = s.applyDate ? s.applyDate.slice(5,7)+s.applyDate.slice(8,10) : '날짜미지정';
-    const shopCount = new Set((s.items||[]).map(it=>(it.shopName||'').trim()).filter(Boolean)).size;
+    const r = calcSaipFee(s.items||[], s.ship);
+    const mmdd = saipMMDD(s);
+    const shopCount = saipShopCountOf(s.items);
+    const linked = state.saips.filter(x=> x.sentWithId === s.id);
+    const sentTo = s.sentWithId ? state.saips.find(x=> x.id === s.sentWithId) : null;
+    let badge = '';
+    if(s.ship === '보관') badge = s.storedStatus === 'sent' ? '<span class="b-wannap">발송완료</span>' : '<span class="b-keep">보관중</span>';
+    let extra = '';
+    if(linked.length) extra = `<div class="saip-meta" style="margin-top:3px;">함께 보내는 보관건: ${linked.map(x=>escapeHtml(saipLabel(x))).join(', ')}</div>`;
+    else if(sentTo) extra = `<div class="saip-meta" style="margin-top:3px;">→ ${escapeHtml(saipLabel(sentTo))} 신청건과 함께 발송</div>`;
     return `<div class="saip-card" onclick="openSaipDetail('${s.id}')">
-      <div class="saip-top"><span class="saip-date">${mmdd} · ${s.type||'주문'}</span></div>
+      <div class="saip-top"><span class="saip-date">${mmdd} · ${s.type||'주문'}</span><span class="saip-badges">${badge}</span></div>
       <div class="saip-meta">상품 ${((s.items||[]).length)}건 · 거래처 ${shopCount}곳</div>
+      ${extra}
       <div class="saip-total">${fmtMoney(r.itemsGrand)}${r.daenapTotal>0? ` <span style="font-size:11px; color:var(--navy-soft); font-weight:700;">(대납 ${fmtMoney(r.daenapTotal)})</span>`:''}</div>
     </div>`;
   }).join('');
@@ -1516,21 +1600,23 @@ function copySaipText(id){
 function openSaipDetail(id){
   const s = state.saips.find(x=>x.id===id); if(!s) return;
   ui.viewingSaipId = id;
-  const r = calcSaipFee(s.items||[]);
+  const r = calcSaipFee(s.items||[], s.ship);
+  const linked = state.saips.filter(x=> x.sentWithId === s.id);
+  const sentTo = s.sentWithId ? state.saips.find(x=> x.id === s.sentWithId) : null;
   const copyText = buildSaipCopyText(s);
-  document.getElementById('saipDetailBody').innerHTML = `
+  let statusLine = '';
+  if(s.ship === '보관'){
+    statusLine = s.storedStatus === 'sent'
+      ? `<div style="margin-bottom:12px;"><span class="saip-badges"><span class="b-wannap">발송완료</span></span> <span style="font-size:12px; color:var(--gray); font-weight:600;">${sentTo ? '→ '+escapeHtml(saipLabel(sentTo))+' 신청건과 함께 발송' : ''}</span></div>`
+      : `<div style="margin-bottom:12px;"><span class="saip-badges"><span class="b-keep" style="margin-left:0;">보관중</span></span></div>`;
+  }
+  document.getElementById('saipDetailBody').innerHTML = `${statusLine}
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
       <span style="font-size:12px; color:var(--gray); font-weight:700;">복사용 포맷</span>
       <button class="copy-btn" onclick="copySaipText('${s.id}')">복사</button>
     </div>
     <pre style="white-space:pre-wrap; background:#fff; border-radius:12px; padding:14px; font-size:13px; line-height:1.6; color:var(--navy); font-family:inherit; margin:0 0 14px;">${escapeHtml(copyText)}</pre>
-    <div class="fee-box">
-      <div class="fee-row"><span>대납 상품 합계</span><span>${fmtMoney(r.daenapTotal)}</span></div>
-      <div class="fee-row"><span>완납 상품 합계 (별도 정산됨)</span><span>${fmtMoney(r.wannapTotal)}</span></div>
-      <div class="fee-row"><span>거래처 수수료 (${r.shopCount}곳 × 2,000원)</span><span>${fmtMoney(r.shopCount*SAIP_FEE_PER_SHOP)}</span></div>
-      <div class="fee-row"><span>택배비</span><span>${fmtMoney((s.items||[]).length?SAIP_SHIPPING_FEE:0)}</span></div>
-      <div class="fee-row total"><span>총 결제금액 (대납분+수수료)</span><span>${fmtMoney(r.grandTotal)}</span></div>
-    </div>`;
+    <div class="fee-box">${saipFeeBoxInner(r, s.ship, linked)}</div>`;
   openModal('saipDetailModal');
 }
 function editCurrentSaip(){ closeModal('saipDetailModal'); openSaipEdit(ui.viewingSaipId); }
